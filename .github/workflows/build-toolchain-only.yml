@@ -1,13 +1,11 @@
-name: Build RISC-V 32-bit Cross-Compilation Packages
+name: Build RISC-V 32-bit Toolchain (Core Only)
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ toolchain-test ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ toolchain-test ]
   workflow_dispatch:
-  release:
-    types: [created]
 
 jobs:
   build:
@@ -76,55 +74,13 @@ jobs:
         ls -la build/libc6*.deb
         sudo dpkg -i build/libc6-riscv32-cross_*_all.deb build/libc6-dev-riscv32-cross_*_all.deb build/libc6-dbg-riscv32-cross_*_all.deb
 
-    - name: Build libxcrypt
-      run: |
-        bash scripts/build-libxcrypt.sh
-        sudo dpkg -i build/libcrypt1-riscv32-cross_*.deb build/libcrypt-dev-riscv32-cross_*.deb
-
-    - name: Build libunistring
-      run: |
-        bash scripts/build-libunistring.sh
-        sudo dpkg -i build/libunistring5-riscv32-cross_*.deb
-
-    - name: Build libidn2
-      run: |
-        bash scripts/build-libidn2.sh
-        sudo dpkg -i build/libidn2-0-riscv32-cross_*.deb
-
-    - name: Build zlib
-      run: |
-        bash scripts/build-zlib.sh
-        sudo dpkg -i build/zlib1g-riscv32-cross_*.deb build/zlib1g-dev-riscv32-cross_*.deb
-
-    - name: Build mbedtls
-      run: |
-        bash scripts/build-mbedtls.sh
-        sudo dpkg -i build/libmbedcrypto7-riscv32-cross_*.deb build/libmbedx509-1-riscv32-cross_*.deb build/libmbedtls14-riscv32-cross_*.deb build/libmbedtls-dev-riscv32-cross_*.deb
-
     - name: List generated packages
       run: |
         ls -lh build/*.deb
 
-    - name: Upload packages as artifacts
+    - name: Upload toolchain packages
       uses: actions/upload-artifact@v4
       with:
-        name: riscv32-cross-packages
+        name: riscv32-toolchain-packages
         path: build/*.deb
-        retention-days: 90
-
-    - name: Create package list
-      if: github.event_name == 'release'
-      run: |
-        cd build
-        sha256sum *.deb > SHA256SUMS
-        cat SHA256SUMS
-
-    - name: Upload to release
-      if: github.event_name == 'release'
-      uses: softprops/action-gh-release@v1
-      with:
-        files: |
-          build/*.deb
-          build/SHA256SUMS
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        retention-days: 7

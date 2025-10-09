@@ -4,20 +4,31 @@ set -euo pipefail
 # Common configuration for all build scripts
 export ARCH=riscv32
 export TARGET=riscv32-linux-gnu
-export MARCH=rv32imc
+export MARCH=rv32imac
 export MABI=ilp32
 export JOBS=$(nproc)
 
 # Toolchain configuration
-export CC=riscv64-linux-gnu-gcc
-export CXX=riscv64-linux-gnu-g++
-export AR=riscv64-linux-gnu-ar
-export RANLIB=riscv64-linux-gnu-ranlib
-export STRIP=riscv64-linux-gnu-strip
+# For building glibc and other core libraries, prefer the riscv32 compiler if available
+# For building other libraries that need a working libc, fall back to riscv64
+if command -v riscv32-linux-gnu-gcc &> /dev/null; then
+    export CC=riscv32-linux-gnu-gcc
+    export CXX=riscv32-linux-gnu-g++
+    export AR=riscv32-linux-gnu-ar
+    export RANLIB=riscv32-linux-gnu-ranlib
+    export STRIP=riscv32-linux-gnu-strip
+else
+    # Fall back to riscv64 compiler with 32-bit flags
+    export CC=riscv64-linux-gnu-gcc
+    export CXX=riscv64-linux-gnu-g++
+    export AR=riscv64-linux-gnu-ar
+    export RANLIB=riscv64-linux-gnu-ranlib
+    export STRIP=riscv64-linux-gnu-strip
+fi
 
 # Common flags for 32-bit RISC-V
-export CFLAGS="-march=${MARCH} -mabi=${MABI} -O2"
-export CXXFLAGS="-march=${MARCH} -mabi=${MABI} -O2"
+export CFLAGS="-march=${MARCH} -mabi=${MABI} -O2 -fno-semantic-interposition"
+export CXXFLAGS="-march=${MARCH} -mabi=${MABI} -O2 -fno-semantic-interposition"
 export LDFLAGS="-march=${MARCH} -mabi=${MABI}"
 
 # Installation prefix

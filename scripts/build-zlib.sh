@@ -4,23 +4,40 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/common.sh"
 
+# zlib needs a working compiler that can link against libc
+# Force use of riscv64 compiler even if riscv32 exists (stage 1 can't link)
+export CC=riscv64-linux-gnu-gcc
+export CXX=riscv64-linux-gnu-g++
+export AR=riscv64-linux-gnu-ar
+export RANLIB=riscv64-linux-gnu-ranlib
+# Ensure CFLAGS and LDFLAGS have the architecture flags for riscv32
+export CFLAGS="-march=${MARCH} -mabi=${MABI} -O2 -fno-semantic-interposition"
+export CXXFLAGS="-march=${MARCH} -mabi=${MABI} -O2 -fno-semantic-interposition"
+export LDFLAGS="-march=${MARCH} -mabi=${MABI}"
+
 ZLIB_VERSION=1.3.1
 PACKAGE_NAME=zlib1g-riscv32-cross
 BUILD_DIR=$(pwd)/build/zlib
 INSTALL_DIR=$(pwd)/build/${PACKAGE_NAME}
 
-log_info "Building zlib ${ZLIB_VERSION} for ${TARGET}"
+log_info "Building zlib for ${TARGET}"
 
-# Download zlib source
-if [ ! -f "zlib-${ZLIB_VERSION}.tar.gz" ]; then
-    log_info "Downloading zlib ${ZLIB_VERSION}..."
-    wget -q https://zlib.net/zlib-${ZLIB_VERSION}.tar.gz
+# Get zlib source from Ubuntu
+if [ ! -d "zlib-${ZLIB_VERSION}" ]; then
+    log_info "Getting zlib source from Ubuntu..."
+    apt-get source zlib
+    # Find the extracted directory
+    ZLIB_SRC_DIR=$(ls -d zlib*/ 2>/dev/null | head -1 | sed 's:/$::')
+    if [ -z "$ZLIB_SRC_DIR" ]; then
+        log_error "Failed to extract zlib source"
+        exit 1
+    fi
+    # Rename if necessary
+    if [ "$ZLIB_SRC_DIR" != "zlib-${ZLIB_VERSION}" ] && [ ! -d "zlib-${ZLIB_VERSION}" ]; then
+        log_info "Renaming $ZLIB_SRC_DIR to zlib-${ZLIB_VERSION}"
+        mv "$ZLIB_SRC_DIR" zlib-${ZLIB_VERSION}
+    fi
 fi
-
-# Extract source
-log_info "Extracting zlib source..."
-rm -rf zlib-${ZLIB_VERSION}
-tar xzf zlib-${ZLIB_VERSION}.tar.gz
 
 # Create build directory
 rm -rf ${BUILD_DIR}
