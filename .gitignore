@@ -1,0 +1,30 @@
+# Build artifacts
+build/
+*.deb
+*.tar.gz
+*.tar.xz
+*.tar.bz2
+
+# Source directories
+glibc-*/
+zlib-*/
+mbedtls-*/
+
+# Temporary files
+*.o
+*.a
+*.so
+*.so.*
+*.log
+*.tmp
+*~
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Package metadata
+DEBIAN/
