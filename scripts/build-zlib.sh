@@ -4,16 +4,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/common.sh"
 
-# zlib needs a working compiler that can link against libc
-# Force use of riscv64 compiler even if riscv32 exists (stage 1 can't link)
-export CC=riscv64-linux-gnu-gcc
-export CXX=riscv64-linux-gnu-g++
-export AR=riscv64-linux-gnu-ar
-export RANLIB=riscv64-linux-gnu-ranlib
-# Ensure CFLAGS and LDFLAGS have the architecture flags for riscv32
-export CFLAGS="-march=${MARCH} -mabi=${MABI} -O2 -fno-semantic-interposition"
-export CXXFLAGS="-march=${MARCH} -mabi=${MABI} -O2 -fno-semantic-interposition"
-export LDFLAGS="-march=${MARCH} -mabi=${MABI}"
+# zlib build uses the riscv32 toolchain from common.sh
+# CC, AR, RANLIB, CFLAGS, etc. are already set by common.sh
 
 ZLIB_VERSION=1.3.1
 PACKAGE_NAME=zlib1g-riscv32-cross

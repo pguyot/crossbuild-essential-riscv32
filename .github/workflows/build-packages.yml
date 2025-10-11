@@ -23,9 +23,6 @@ jobs:
         sudo sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources
         sudo apt-get update
         sudo apt-get install -y \
-          gcc-riscv64-linux-gnu \
-          g++-riscv64-linux-gnu \
-          binutils-riscv64-linux-gnu \
           build-essential \
           cmake \
           wget \
@@ -34,18 +31,19 @@ jobs:
           flex \
           texinfo \
           python3 \
-          libgmp-dev \
-          libmpfr-dev \
-          libmpc-dev \
-          libisl-dev \
           autoconf \
           automake \
           libtool \
           pkg-config
 
+    - name: Setup official RISC-V 32-bit toolchain
+      run: |
+        bash scripts/setup-toolchain.sh
+        echo "/opt/riscv32/bin" >> $GITHUB_PATH
+
     - name: Display toolchain info
       run: |
-        riscv64-linux-gnu-gcc --version
+        riscv32-linux-gnu-gcc --version
         cmake --version
 
     - name: Make scripts executable
@@ -58,17 +56,6 @@ jobs:
       run: |
         bash scripts/build-linux-headers.sh
         sudo dpkg -i build/linux-libc-dev-riscv32-cross_*.deb
-
-    - name: Build binutils for riscv32
-      run: bash scripts/build-binutils.sh
-
-    - name: Build GCC support (old riscv64 toolchain)
-      run: |
-        bash scripts/build-gcc-support.sh
-        sudo dpkg -i build/gcc-14-base-riscv32-cross_*.deb build/libgcc-s1-riscv32-cross_*.deb
-
-    - name: Build GCC for riscv32
-      run: bash scripts/build-gcc-riscv32.sh
 
     - name: Build glibc
       run: |

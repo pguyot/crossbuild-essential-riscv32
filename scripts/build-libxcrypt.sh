@@ -4,16 +4,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/common.sh"
 
-# libxcrypt needs a working compiler that can link against libc
-# Force use of riscv64 compiler even if riscv32 exists (stage 1 can't link)
-export CC=riscv64-linux-gnu-gcc
-export CXX=riscv64-linux-gnu-g++
-export AR=riscv64-linux-gnu-ar
-export RANLIB=riscv64-linux-gnu-ranlib
-# Ensure CFLAGS and LDFLAGS have the architecture flags for riscv32
-export CFLAGS="-march=${MARCH} -mabi=${MABI} -O2 -fno-semantic-interposition"
-export CXXFLAGS="-march=${MARCH} -mabi=${MABI} -O2 -fno-semantic-interposition"
-export LDFLAGS="-march=${MARCH} -mabi=${MABI}"
+# libxcrypt build configuration
+# Note: CC, AR, RANLIB, etc. are set by common.sh
 
 LIBXCRYPT_VERSION=4.4.36
 PACKAGE_NAME=libcrypt1-riscv32-cross
@@ -54,12 +46,13 @@ cd libxcrypt-${LIBXCRYPT_VERSION}
 
 # Configure and build libxcrypt
 log_info "Configuring libxcrypt..."
+# Add -Wno-error to work around GCC 15 stricter warnings
 ./configure \
     --prefix=${PREFIX} \
     --host=${TARGET} \
     --build=x86_64-linux-gnu \
     CC="${CC}" \
-    CFLAGS="${CFLAGS}" \
+    CFLAGS="${CFLAGS} -Wno-error" \
     --disable-static \
     --enable-shared \
     --enable-hashes=all \

@@ -42,18 +42,9 @@ log_info "Configuring glibc..."
 # Use -Os instead of -O2 to avoid inlining issues with PIC code
 GLIBC_CFLAGS="-Os -fno-semantic-interposition"
 GLIBC_CXXFLAGS="-Os -fno-semantic-interposition"
-# Set CC - if using riscv64 compiler, add arch flags and linker emulation
-if [ "$CC" == "riscv64-linux-gnu-gcc" ]; then
-    GLIBC_CFLAGS="-march=${MARCH} -mabi=${MABI} ${GLIBC_CFLAGS}"
-    GLIBC_CXXFLAGS="-march=${MARCH} -mabi=${MABI} ${GLIBC_CXXFLAGS}"
-    GLIBC_CC="${CC} -march=${MARCH} -mabi=${MABI} -Wl,-melf32lriscv_ilp32"
-    GLIBC_CXX="${CXX} -march=${MARCH} -mabi=${MABI} -Wl,-melf32lriscv_ilp32"
-else
-    # Native riscv32 compiler - already configured for rv32imac/ilp32
-    # Just pass it through without modification
-    GLIBC_CC="${CC}"
-    GLIBC_CXX="${CXX}"
-fi
+# The riscv32 toolchain is already configured with the correct arch/abi
+GLIBC_CC="${CC}"
+GLIBC_CXX="${CXX}"
 ../../glibc-${GLIBC_VERSION}/configure \
     --prefix=${PREFIX} \
     --host=${TARGET} \
