@@ -41,9 +41,15 @@ for tool in riscv32-unknown-linux-gnu-*; do
     fi
 done
 
+# Copy toolchain libraries to standard cross-compilation location
+log_info "Setting up cross-compilation sysroot at /usr/riscv32-linux-gnu..."
+sudo mkdir -p /usr/riscv32-linux-gnu
+sudo cp -rn ${TOOLCHAIN_DIR}/sysroot/* /usr/riscv32-linux-gnu/ || true
+
 # Verify installation
 ${TOOLCHAIN_DIR}/bin/riscv32-linux-gnu-gcc --version | head -1
 
 log_info "Toolchain setup complete!"
 log_info "Toolchain installed at: ${TOOLCHAIN_DIR}"
+log_info "Sysroot copied to: /usr/riscv32-linux-gnu"
 log_info "Add ${TOOLCHAIN_DIR}/bin to PATH to use it"
