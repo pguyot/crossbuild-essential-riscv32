@@ -73,20 +73,20 @@ jobs:
         bash scripts/build-libunistring.sh
         sudo dpkg -i build/libunistring5-riscv32-cross_*.deb
 
-    - name: Build libidn2
-      run: |
-        bash scripts/build-libidn2.sh
-        sudo dpkg -i build/libidn2-0-riscv32-cross_*.deb
+    # - name: Build libidn2
+    #   run: |
+    #     bash scripts/build-libidn2.sh
+    #     sudo dpkg -i build/libidn2-0-riscv32-cross_*.deb
 
-    - name: Build zlib
-      run: |
-        bash scripts/build-zlib.sh
-        sudo dpkg -i build/zlib1g-riscv32-cross_*.deb build/zlib1g-dev-riscv32-cross_*.deb
+    # - name: Build zlib
+    #   run: |
+    #     bash scripts/build-zlib.sh
+    #     sudo dpkg -i build/zlib1g-riscv32-cross_*.deb build/zlib1g-dev-riscv32-cross_*.deb
 
-    - name: Build mbedtls
-      run: |
-        bash scripts/build-mbedtls.sh
-        sudo dpkg -i build/libmbedcrypto7-riscv32-cross_*.deb build/libmbedx509-1-riscv32-cross_*.deb build/libmbedtls14-riscv32-cross_*.deb build/libmbedtls-dev-riscv32-cross_*.deb
+    # - name: Build mbedtls
+    #   run: |
+    #     bash scripts/build-mbedtls.sh
+    #     sudo dpkg -i build/libmbedcrypto7-riscv32-cross_*.deb build/libmbedx509-1-riscv32-cross_*.deb build/libmbedtls14-riscv32-cross_*.deb build/libmbedtls-dev-riscv32-cross_*.deb
 
     - name: List generated packages
       run: |
