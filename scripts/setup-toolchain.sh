@@ -41,11 +41,25 @@ for tool in riscv32-unknown-linux-gnu-*; do
     fi
 done
 
-# Copy toolchain libraries to standard cross-compilation location
+# Copy toolchain sysroot to Ubuntu's standard cross-compilation layout
 log_info "Setting up cross-compilation sysroot at /usr/riscv32-linux-gnu..."
-sudo mkdir -p /usr/riscv32-linux-gnu
-# Use -a to preserve permissions and -f to force overwrite any existing files
-sudo cp -af ${TOOLCHAIN_DIR}/sysroot/* /usr/riscv32-linux-gnu/ || true
+sudo mkdir -p /usr/riscv32-linux-gnu/{lib,include}
+
+# Copy runtime libraries from /lib
+sudo cp -af ${TOOLCHAIN_DIR}/sysroot/lib/* /usr/riscv32-linux-gnu/lib/ 2>/dev/null || true
+
+# Copy static libraries and object files from /usr/lib (merge into same lib dir)
+sudo cp -af ${TOOLCHAIN_DIR}/sysroot/usr/lib/* /usr/riscv32-linux-gnu/lib/ 2>/dev/null || true
+
+# Copy headers from /usr/include
+sudo cp -af ${TOOLCHAIN_DIR}/sysroot/usr/include/* /usr/riscv32-linux-gnu/include/ 2>/dev/null || true
+
+# Fix libc.so linker script to use correct paths for cross-compilation
+# The toolchain's libc.so references /lib/ and /usr/lib/, but we need /usr/riscv32-linux-gnu/lib/
+log_info "Fixing linker scripts for cross-compilation..."
+sudo sed -i 's|/lib/libc\.so\.6|/usr/riscv32-linux-gnu/lib/libc.so.6|g' /usr/riscv32-linux-gnu/lib/libc.so
+sudo sed -i 's|/usr/lib/libc_nonshared\.a|/usr/riscv32-linux-gnu/lib/libc_nonshared.a|g' /usr/riscv32-linux-gnu/lib/libc.so
+sudo sed -i 's|/lib/ld-linux-riscv32-ilp32d\.so\.1|/usr/riscv32-linux-gnu/lib/ld-linux-riscv32-ilp32d.so.1|g' /usr/riscv32-linux-gnu/lib/libc.so
 
 # Verify installation
 ${TOOLCHAIN_DIR}/bin/riscv32-linux-gnu-gcc --version | head -1
