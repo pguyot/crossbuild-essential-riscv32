@@ -84,7 +84,7 @@ cp -a ${INSTALL_DIR}${PREFIX}/lib/*.so* ${RUNTIME_DIR}${PREFIX}/lib/ || true
 
 cat > ${RUNTIME_DIR}/DEBIAN/control << EOF
 Package: libcrypt1-riscv32-cross
-Version: 1:${LIBXCRYPT_VERSION}-0ubuntu1
+Version: ${LIBXCRYPT_VERSION}-0ubuntu1
 Section: libs
 Priority: optional
 Architecture: all
@@ -104,8 +104,8 @@ Description: libxcrypt shared library (for RISC-V 32-bit cross-compiling)
 EOF
 
 cd ..
-dpkg-deb --build ${RUNTIME_DIR} build/libcrypt1-riscv32-cross_1-${LIBXCRYPT_VERSION}-0ubuntu1_all.deb
-log_info "Created: libcrypt1-riscv32-cross_1-${LIBXCRYPT_VERSION}-0ubuntu1_all.deb"
+dpkg-deb --build ${RUNTIME_DIR} build/libcrypt1-riscv32-cross_${LIBXCRYPT_VERSION}-0ubuntu1_all.deb
+log_info "Created: libcrypt1-riscv32-cross_${LIBXCRYPT_VERSION}-0ubuntu1_all.deb"
 
 # Create development package (libcrypt-dev-riscv32-cross)
 log_info "Creating libcrypt-dev-riscv32-cross package..."
@@ -121,11 +121,11 @@ cp -a ${INSTALL_DIR}${PREFIX}/share ${DEV_DIR}${PREFIX}/ || true
 
 cat > ${DEV_DIR}/DEBIAN/control << EOF
 Package: libcrypt-dev-riscv32-cross
-Version: 1:${LIBXCRYPT_VERSION}-0ubuntu1
+Version: ${LIBXCRYPT_VERSION}-0ubuntu1
 Section: libdevel
 Priority: optional
 Architecture: all
-Depends: libcrypt1-riscv32-cross (= 1:${LIBXCRYPT_VERSION}-0ubuntu1), libc6-dev-riscv32-cross
+Depends: libcrypt1-riscv32-cross (= ${LIBXCRYPT_VERSION}-0ubuntu1), libc6-dev-riscv32-cross
 Maintainer: ${MAINTAINER}
 Description: libxcrypt development files (for RISC-V 32-bit cross-compiling)
  libxcrypt is a modern library for one-way hashing of passwords.
@@ -135,7 +135,7 @@ Description: libxcrypt development files (for RISC-V 32-bit cross-compiling)
  This package is for cross-compiling.
 EOF
 
-dpkg-deb --build ${DEV_DIR} build/libcrypt-dev-riscv32-cross_1-${LIBXCRYPT_VERSION}-0ubuntu1_all.deb
-log_info "Created: libcrypt-dev-riscv32-cross_1-${LIBXCRYPT_VERSION}-0ubuntu1_all.deb"
+dpkg-deb --build ${DEV_DIR} build/libcrypt-dev-riscv32-cross_${LIBXCRYPT_VERSION}-0ubuntu1_all.deb
+log_info "Created: libcrypt-dev-riscv32-cross_${LIBXCRYPT_VERSION}-0ubuntu1_all.deb"
 
 log_info "libxcrypt build complete!"
