@@ -39,15 +39,21 @@ if [ ! -d "libxcrypt-${LIBXCRYPT_VERSION}" ]; then
     cd ..
 fi
 
+# Verify configure script exists
+if [ ! -f "libxcrypt-${LIBXCRYPT_VERSION}/configure" ]; then
+    log_error "Configure script not found in libxcrypt-${LIBXCRYPT_VERSION}/"
+    exit 1
+fi
+
 # Create build directory
 rm -rf ${BUILD_DIR}
 mkdir -p ${BUILD_DIR}
-cd libxcrypt-${LIBXCRYPT_VERSION}
+cd ${BUILD_DIR}
 
 # Configure and build libxcrypt
 log_info "Configuring libxcrypt..."
 # Add -Wno-error to work around GCC 15 stricter warnings
-./configure \
+../../libxcrypt-${LIBXCRYPT_VERSION}/configure \
     --prefix=${PREFIX} \
     --host=${TARGET} \
     --build=x86_64-linux-gnu \

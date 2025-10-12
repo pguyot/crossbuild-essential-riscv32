@@ -116,8 +116,23 @@ EOF
 # Install to package directory
 log_info "Installing glibc to package directory..."
 mkdir -p ${INSTALL_DIR}${PREFIX}
-# Skip manual/doc installation which can fail with quilt patches
-cd ${BUILD_DIR} && make install-headers install-lib DESTDIR=${INSTALL_DIR}
+# Use full 'make install' but skip manual which can fail
+cd ${BUILD_DIR} && make install DESTDIR=${INSTALL_DIR} || {
+    # If install fails (possibly due to manual/doc), try without those
+    log_info "Full install failed, trying without manual/doc..."
+    cd ${BUILD_DIR} && make install-headers install-lib DESTDIR=${INSTALL_DIR}
+
+    # Manually install critical runtime files that install-lib misses
+    log_info "Manually copying libc.so.6 and dynamic loader..."
+    # Copy libc.so.6 (the main C library shared object)
+    if [ -f ${BUILD_DIR}/libc.so ]; then
+        cp -a ${BUILD_DIR}/libc.so ${INSTALL_DIR}${PREFIX}/lib/libc.so.6
+    fi
+    # Copy the dynamic loader (ld.so from elf/ subdirectory)
+    if [ -f ${BUILD_DIR}/elf/ld.so ]; then
+        cp -a ${BUILD_DIR}/elf/ld.so ${INSTALL_DIR}${PREFIX}/lib/ld-linux-riscv32-ilp32d.so.1
+    fi
+}
 
 # Manually copy lib-names-ilp32.h if it was generated
 if [ -f ${BUILD_DIR}/gnu/lib-names-ilp32.h ]; then

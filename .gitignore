@@ -5,10 +5,21 @@ build/
 *.tar.xz
 *.tar.bz2
 
-# Source directories
+# Source directories and Debian source packages
 glibc-*/
+glibc_*
+libidn2-*/
+libidn2_*
 zlib-*/
+zlib_*
 mbedtls-*/
+mbedtls_*
+libxcrypt-*/
+libxcrypt_*
+libunistring-*/
+libunistring_*
+linux-*/
+linux_*
 
 # Temporary files
 *.o
