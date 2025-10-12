@@ -1,0 +1,229 @@
+name: Build RISC-V GNU Toolchain DEB Package
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Run weekly on Monday at 00:00 UTC to check for new releases
+    - cron: '0 0 * * 1'
+  push:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 480  # 8 hours max for build
+
+    steps:
+      - name: Checkout this repository
+        uses: actions/checkout@v4
+
+      - name: Get latest riscv-gnu-toolchain release
+        id: get_version
+        run: |
+          # Get the latest release tag (date-based format like 2025.09.28)
+          LATEST_TAG=$(curl -s https://api.github.com/repos/riscv-collab/riscv-gnu-toolchain/releases | jq -r '.[0].tag_name')
+          echo "release_tag=${LATEST_TAG}" >> $GITHUB_OUTPUT
+          echo "Latest release tag: ${LATEST_TAG}"
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            autoconf automake autotools-dev curl python3 python3-pip python3-tomli \
+            libmpc-dev libmpfr-dev libgmp-dev gawk build-essential bison flex \
+            texinfo gperf libtool patchutils bc zlib1g-dev libexpat-dev \
+            ninja-build git cmake libglib2.0-dev libslirp-dev libpixman-1-dev
+
+      - name: Clone riscv-gnu-toolchain
+        run: |
+          git clone --depth 1 --branch ${{ steps.get_version.outputs.release_tag }} https://github.com/riscv-collab/riscv-gnu-toolchain.git
+
+      - name: Free up disk space
+        run: |
+          # Remove unnecessary packages to free up disk space
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+          df -h
+
+      - name: Configure toolchain for common rv32 variants with multilib
+        run: |
+          cd riscv-gnu-toolchain
+
+          # Create multilib generator configuration for common rv32 variants
+          # Focus on most commonly used configurations to save disk space
+          MULTILIB_GEN="rv32imac-ilp32--;rv32imafc-ilp32f--;rv32gc-ilp32d--"
+
+          ./configure \
+            --prefix=/opt/riscv \
+            --enable-multilib \
+            --with-multilib-generator="${MULTILIB_GEN}" \
+            --enable-languages=c,c++ \
+            --disable-gdb
+
+      - name: Build Linux toolchain
+        run: |
+          cd riscv-gnu-toolchain
+          make linux -j$(nproc)
+
+      - name: Verify multilib libraries
+        run: |
+          echo "Checking installed multilib variants:"
+          find /opt/riscv -name "libc.so*" -o -name "libgcc.a" | head -20
+
+      - name: Create DEB package structure
+        run: |
+          PKG_NAME="riscv32-gnu-toolchain-multilib"
+          PKG_VERSION="${{ steps.get_version.outputs.release_tag }}"
+          PKG_ARCH="amd64"
+          PKG_DIR="${PKG_NAME}_${PKG_VERSION}_${PKG_ARCH}"
+
+          # Create package directory structure
+          mkdir -p "${PKG_DIR}/DEBIAN"
+          mkdir -p "${PKG_DIR}/opt"
+
+          # Copy installed toolchain
+          cp -r /opt/riscv "${PKG_DIR}/opt/"
+
+          # Get installed size in KB
+          INSTALLED_SIZE=$(du -sk "${PKG_DIR}/opt" | cut -f1)
+
+          # Create control file
+          cat > "${PKG_DIR}/DEBIAN/control" <<EOF
+          Package: ${PKG_NAME}
+          Version: ${PKG_VERSION}
+          Section: devel
+          Priority: optional
+          Architecture: ${PKG_ARCH}
+          Installed-Size: ${INSTALLED_SIZE}
+          Maintainer: GitHub Actions <noreply@github.com>
+          Description: RISC-V GNU Toolchain for rv32 variants (Linux/ELF)
+           Cross-compilation toolchain for RISC-V 32-bit targets with multilib support.
+           Built from riscv-gnu-toolchain ${{ steps.get_version.outputs.release_tag }}.
+           .
+           Supports common rv32 architecture variants:
+           - rv32imac (no FPU, with compressed instructions)
+           - rv32imafc (single-precision FPU)
+           - rv32gc (double-precision FPU)
+           .
+           Languages: C and C++ (Fortran disabled to save space)
+           .
+           Includes libraries for variants with appropriate ABIs:
+           - ilp32 (soft-float)
+           - ilp32f (single-precision hardware float)
+           - ilp32d (double-precision hardware float)
+          Homepage: https://github.com/riscv-collab/riscv-gnu-toolchain
+          EOF
+
+          # Create postinst script
+          cat > "${PKG_DIR}/DEBIAN/postinst" <<'EOF'
+          #!/bin/bash
+          set -e
+
+          echo "=========================================="
+          echo "RISC-V GNU Toolchain installed to /opt/riscv"
+          echo "=========================================="
+          echo ""
+          echo "Add /opt/riscv/bin to your PATH to use the toolchain:"
+          echo "  export PATH=/opt/riscv/bin:\$PATH"
+          echo ""
+          echo "Usage examples:"
+          echo "  # rv32imac (no FPU, soft-float):"
+          echo "  riscv32-unknown-linux-gnu-gcc -march=rv32imac -mabi=ilp32 -o app app.c"
+          echo ""
+          echo "  # rv32imafc (single-precision FPU):"
+          echo "  riscv32-unknown-linux-gnu-gcc -march=rv32imafc -mabi=ilp32f -o app app.c"
+          echo ""
+          echo "  # rv32gc (double-precision FPU):"
+          echo "  riscv32-unknown-linux-gnu-gcc -march=rv32gc -mabi=ilp32d -o app app.c"
+          echo ""
+          EOF
+
+          chmod 755 "${PKG_DIR}/DEBIAN/postinst"
+
+          # Build the package
+          dpkg-deb --build --root-owner-group "${PKG_DIR}"
+
+          # Save package name for upload
+          echo "deb_file=${PKG_DIR}.deb" >> $GITHUB_ENV
+          echo "pkg_version=${PKG_VERSION}" >> $GITHUB_ENV
+          echo "pkg_name=${PKG_NAME}" >> $GITHUB_ENV
+
+      - name: Generate package info
+        run: |
+          echo "Package built: ${{ env.deb_file }}"
+          ls -lh *.deb
+          dpkg-deb --info ${{ env.deb_file }}
+
+      - name: Upload DEB package
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.pkg_name }}-${{ env.pkg_version }}
+          path: "*.deb"
+          retention-days: 90
+
+      - name: Create Release
+        if: github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: riscv-toolchain-${{ steps.get_version.outputs.release_tag }}
+          name: RISC-V GNU Toolchain ${{ steps.get_version.outputs.release_tag }}
+          body: |
+            # RISC-V GNU Toolchain DEB Package (rv32 Common Variants)
+
+            Based on upstream release: **${{ steps.get_version.outputs.release_tag }}**
+
+            ## Supported Architectures
+
+            This package includes multilib support for common rv32 variants:
+
+            | Architecture | Extensions | ABI | FPU Support | Use Case |
+            |-------------|------------|-----|-------------|----------|
+            | rv32imac | Integer, Multiply, Atomics, Compressed | ilp32 | None (soft-float) | Embedded, no FPU |
+            | rv32imafc | + Single-precision FP | ilp32f | Single-precision | DSP, light FP work |
+            | rv32gc | Full (imafdc) | ilp32d | Double-precision | General purpose |
+
+            **Languages**: C and C++ (Fortran disabled to reduce package size)
+
+            ## Installation
+
+            ```bash
+            sudo dpkg -i ${{ env.deb_file }}
+            export PATH=/opt/riscv/bin:$PATH
+            ```
+
+            ## Usage Examples
+
+            ### No FPU (soft-float) - rv32imac
+            ```bash
+            riscv32-unknown-linux-gnu-gcc -march=rv32imac -mabi=ilp32 -o hello hello.c
+            ```
+
+            ### Single-precision FPU - rv32imafc
+            ```bash
+            riscv32-unknown-linux-gnu-gcc -march=rv32imafc -mabi=ilp32f -o hello hello.c
+            ```
+
+            ### Double-precision FPU - rv32gc
+            ```bash
+            riscv32-unknown-linux-gnu-gcc -march=rv32gc -mabi=ilp32d -o hello hello.c
+            ```
+
+            ## Verification
+
+            Check available multilibs:
+            ```bash
+            riscv32-unknown-linux-gnu-gcc --print-multi-lib
+            ```
+
+            ## Target Details
+            - **Platform**: Linux (ELF)
+            - **Bit width**: 32-bit only
+            - **Multilib**: Enabled for all rv32 variants
+            - **Toolchain prefix**: riscv32-unknown-linux-gnu-
+          files: "*.deb"
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
