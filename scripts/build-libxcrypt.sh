@@ -75,7 +75,8 @@ make install DESTDIR=${INSTALL_DIR}
 
 # Create runtime package (libcrypt1-riscv32-cross)
 log_info "Creating libcrypt1-riscv32-cross package..."
-RUNTIME_DIR=$(pwd)/../build/libcrypt1-riscv32-cross-runtime
+cd ../..
+RUNTIME_DIR=$(pwd)/build/libcrypt1-riscv32-cross-runtime
 mkdir -p ${RUNTIME_DIR}/DEBIAN
 mkdir -p ${RUNTIME_DIR}${PREFIX}/lib
 
@@ -103,7 +104,6 @@ Description: libxcrypt shared library (for RISC-V 32-bit cross-compiling)
  This package is for cross-compiling.
 EOF
 
-cd ..
 dpkg-deb --build ${RUNTIME_DIR} build/libcrypt1-riscv32-cross_${LIBXCRYPT_VERSION}-0ubuntu1_all.deb
 log_info "Created: libcrypt1-riscv32-cross_${LIBXCRYPT_VERSION}-0ubuntu1_all.deb"
 
