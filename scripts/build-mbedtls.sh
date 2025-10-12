@@ -62,7 +62,8 @@ make install DESTDIR=${INSTALL_DIR}
 
 # Create libmbedcrypto package
 log_info "Creating libmbedcrypto7-riscv32-cross package..."
-CRYPTO_DIR=$(pwd)/../build/libmbedcrypto7-riscv32-cross
+cd ../..
+CRYPTO_DIR=$(pwd)/build/libmbedcrypto7-riscv32-cross
 mkdir -p ${CRYPTO_DIR}/DEBIAN
 mkdir -p ${CRYPTO_DIR}${PREFIX}/lib
 
@@ -83,7 +84,6 @@ Description: lightweight crypto library - runtime (for RISC-V 32-bit)
  This package is for cross-compiling.
 EOF
 
-cd ..
 dpkg-deb --build ${CRYPTO_DIR} build/libmbedcrypto7-riscv32-cross_${MBEDTLS_VERSION}-0ubuntu1_all.deb
 log_info "Created: libmbedcrypto7-riscv32-cross_${MBEDTLS_VERSION}-0ubuntu1_all.deb"
 
