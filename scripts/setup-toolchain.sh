@@ -44,7 +44,8 @@ done
 # Copy toolchain libraries to standard cross-compilation location
 log_info "Setting up cross-compilation sysroot at /usr/riscv32-linux-gnu..."
 sudo mkdir -p /usr/riscv32-linux-gnu
-sudo cp -rn ${TOOLCHAIN_DIR}/sysroot/* /usr/riscv32-linux-gnu/ || true
+# Use -a to preserve permissions and -f to force overwrite any existing files
+sudo cp -af ${TOOLCHAIN_DIR}/sysroot/* /usr/riscv32-linux-gnu/ || true
 
 # Verify installation
 ${TOOLCHAIN_DIR}/bin/riscv32-linux-gnu-gcc --version | head -1
