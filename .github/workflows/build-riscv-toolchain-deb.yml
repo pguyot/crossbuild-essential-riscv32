@@ -56,7 +56,7 @@ jobs:
           MULTILIB_GEN="rv32imac-ilp32--;rv32imafc-ilp32f--;rv32gc-ilp32d--"
 
           ./configure \
-            --prefix=/opt/riscv \
+            --prefix=/opt/riscv32 \
             --enable-multilib \
             --with-multilib-generator="${MULTILIB_GEN}" \
             --enable-languages=c,c++ \
@@ -70,7 +70,16 @@ jobs:
       - name: Verify multilib libraries
         run: |
           echo "Checking installed multilib variants:"
-          find /opt/riscv -name "libc.so*" -o -name "libgcc.a" | head -20
+          find /opt/riscv32 -name "libc.so*" -o -name "libgcc.a" | sort
+          echo ""
+          echo "Checking multilib configurations:"
+          /opt/riscv32/bin/riscv32-unknown-linux-gnu-gcc -print-multi-lib
+          echo ""
+          echo "Checking sysroot structure:"
+          ls -la /opt/riscv32/sysroot/lib/
+          echo ""
+          echo "Checking for stub files:"
+          ls -la /opt/riscv32/sysroot/usr/include/gnu/stubs*.h
 
       - name: Create DEB package structure
         run: |
@@ -84,7 +93,7 @@ jobs:
           mkdir -p "${PKG_DIR}/opt"
 
           # Copy installed toolchain
-          cp -r /opt/riscv "${PKG_DIR}/opt/"
+          cp -r /opt/riscv32 "${PKG_DIR}/opt/"
 
           # Get installed size in KB
           INSTALLED_SIZE=$(du -sk "${PKG_DIR}/opt" | cut -f1)
@@ -122,11 +131,14 @@ jobs:
           set -e
 
           echo "=========================================="
-          echo "RISC-V GNU Toolchain installed to /opt/riscv"
+          echo "RISC-V GNU Toolchain installed to /opt/riscv32"
           echo "=========================================="
           echo ""
-          echo "Add /opt/riscv/bin to your PATH to use the toolchain:"
-          echo "  export PATH=/opt/riscv/bin:\$PATH"
+          echo "Add /opt/riscv32/bin to your PATH to use the toolchain:"
+          echo "  export PATH=/opt/riscv32/bin:\$PATH"
+          echo ""
+          echo "Check available multilib variants:"
+          echo "  riscv32-unknown-linux-gnu-gcc -print-multi-lib"
           echo ""
           echo "Usage examples:"
           echo "  # rv32imac (no FPU, soft-float):"
@@ -135,7 +147,7 @@ jobs:
           echo "  # rv32imafc (single-precision FPU):"
           echo "  riscv32-unknown-linux-gnu-gcc -march=rv32imafc -mabi=ilp32f -o app app.c"
           echo ""
-          echo "  # rv32gc (double-precision FPU):"
+          echo "  # rv32gc (double-precision FPU, default):"
           echo "  riscv32-unknown-linux-gnu-gcc -march=rv32gc -mabi=ilp32d -o app app.c"
           echo ""
           EOF
