@@ -1,0 +1,80 @@
+name: Build RISC-V 32-bit Cross Libraries
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - libs
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240  # 4 hours max
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            dpkg-dev \
+            devscripts \
+            debhelper \
+            cmake \
+            pkg-config \
+            wget \
+            curl
+
+      - name: Download and install RISC-V 32-bit toolchain
+        run: |
+          # Download the toolchain package from the specific run
+          gh run download 18452360237 \
+            -R pguyot/crossbuild-essential-riscv32 \
+            --name riscv32-gnu-toolchain-multilib-2025.09.28
+
+          # Install the toolchain
+          sudo dpkg -i riscv32-gnu-toolchain-multilib_2025.09.28_amd64.deb
+
+          # Add to PATH for all subsequent steps
+          echo "/opt/riscv/bin" >> $GITHUB_PATH
+
+          # Verify installation - check what binaries are available
+          ls -la /opt/riscv/bin/ | grep gcc || true
+
+          # Try to find the gcc compiler
+          if [ -f /opt/riscv/bin/riscv32-unknown-linux-gnu-gcc ]; then
+            /opt/riscv/bin/riscv32-unknown-linux-gnu-gcc --version
+          elif [ -f /opt/riscv/bin/riscv64-unknown-linux-gnu-gcc ]; then
+            /opt/riscv/bin/riscv64-unknown-linux-gnu-gcc --version
+          else
+            echo "ERROR: Could not find RISC-V GCC compiler"
+            ls -la /opt/riscv/bin/
+            exit 1
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build libc6-dbg:riscv32
+        run: |
+          export PATH=/opt/riscv/bin:$PATH
+          bash scripts/build-libc6-dbg.sh
+
+      - name: Build zlib1g and zlib1g-dev:riscv32
+        run: |
+          export PATH=/opt/riscv/bin:$PATH
+          bash scripts/build-zlib-multiarch.sh
+
+      - name: Build libmbedtls libraries and dev package:riscv32
+        run: |
+          export PATH=/opt/riscv/bin:$PATH
+          bash scripts/build-mbedtls-multiarch.sh
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: riscv32-cross-libs
+          path: build/*.deb
+          retention-days: 90
