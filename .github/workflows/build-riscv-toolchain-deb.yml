@@ -165,8 +165,9 @@ jobs:
 
       - name: Create Release
         if: github.event_name == 'workflow_dispatch'
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
+          repository: ${{ github.repository }}
           tag_name: riscv-toolchain-${{ steps.get_version.outputs.release_tag }}
           name: RISC-V GNU Toolchain ${{ steps.get_version.outputs.release_tag }}
           body: |
