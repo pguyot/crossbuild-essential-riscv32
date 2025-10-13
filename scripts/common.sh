@@ -3,18 +3,18 @@ set -euo pipefail
 
 # Common configuration for all build scripts
 export ARCH=riscv32
-export TARGET=riscv32-unknown-linux-gnu
+export TARGET=riscv32-linux-gnu
 export MARCH=rv32gc
 export MABI=ilp32d
 export JOBS=$(nproc)
 
 # Toolchain configuration - use official riscv32 toolchain
-# The toolchain should be set up with scripts/setup-toolchain.sh first
-export CC=riscv32-unknown-linux-gnu-gcc
-export CXX=riscv32-unknown-linux-gnu-g++
-export AR=riscv32-unknown-linux-gnu-ar
-export RANLIB=riscv32-unknown-linux-gnu-ranlib
-export STRIP=riscv32-unknown-linux-gnu-strip
+# The toolchain is installed at /opt/riscv32/bin
+export CC=riscv32-linux-gnu-gcc
+export CXX=riscv32-linux-gnu-g++
+export AR=riscv32-linux-gnu-ar
+export RANLIB=riscv32-linux-gnu-ranlib
+export STRIP=riscv32-linux-gnu-strip
 
 # Common flags for 32-bit RISC-V
 # Add -Wno-error to prevent GCC 15 stricter warnings from being fatal

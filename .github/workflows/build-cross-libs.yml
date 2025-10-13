@@ -39,38 +39,21 @@ jobs:
           sudo dpkg -i riscv32-gnu-toolchain-multilib_2025.09.28_amd64.deb
 
           # Add to PATH for all subsequent steps
-          echo "/opt/riscv/bin" >> $GITHUB_PATH
+          echo "/opt/riscv32/bin" >> $GITHUB_PATH
 
-          # Verify installation - check what binaries are available
-          ls -la /opt/riscv/bin/ | grep gcc || true
-
-          # Try to find the gcc compiler
-          if [ -f /opt/riscv/bin/riscv32-unknown-linux-gnu-gcc ]; then
-            /opt/riscv/bin/riscv32-unknown-linux-gnu-gcc --version
-          elif [ -f /opt/riscv/bin/riscv64-unknown-linux-gnu-gcc ]; then
-            /opt/riscv/bin/riscv64-unknown-linux-gnu-gcc --version
-          else
-            echo "ERROR: Could not find RISC-V GCC compiler"
-            ls -la /opt/riscv/bin/
-            exit 1
-          fi
+          # Verify installation
+          riscv32-linux-gnu-gcc --version
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build libc6-dbg:riscv32
-        run: |
-          export PATH=/opt/riscv/bin:$PATH
-          bash scripts/build-libc6-dbg.sh
+        run: bash scripts/build-libc6-dbg.sh
 
       - name: Build zlib1g and zlib1g-dev:riscv32
-        run: |
-          export PATH=/opt/riscv/bin:$PATH
-          bash scripts/build-zlib-multiarch.sh
+        run: bash scripts/build-zlib-multiarch.sh
 
       - name: Build libmbedtls libraries and dev package:riscv32
-        run: |
-          export PATH=/opt/riscv/bin:$PATH
-          bash scripts/build-mbedtls-multiarch.sh
+        run: bash scripts/build-mbedtls-multiarch.sh
 
       - name: Upload packages
         uses: actions/upload-artifact@v4

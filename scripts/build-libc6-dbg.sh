@@ -9,8 +9,8 @@ source "${SCRIPT_DIR}/common.sh"
 
 log_info "Building libc6-dbg for ${ARCH}"
 
-# The toolchain should be installed at /opt/riscv
-TOOLCHAIN_SYSROOT="/opt/riscv/sysroot"
+# The toolchain should be installed at /opt/riscv32
+TOOLCHAIN_SYSROOT="/opt/riscv32/sysroot"
 if [ ! -d "${TOOLCHAIN_SYSROOT}" ]; then
     log_error "Toolchain sysroot not found at ${TOOLCHAIN_SYSROOT}"
     log_error "Please install the riscv32-gnu-toolchain-multilib package first"
