@@ -8,14 +8,11 @@ on:
   push:
 
 jobs:
-  build:
+  get-version:
     runs-on: ubuntu-22.04
-    timeout-minutes: 480  # 8 hours max for build
-
+    outputs:
+      release_tag: ${{ steps.get_version.outputs.release_tag }}
     steps:
-      - name: Checkout this repository
-        uses: actions/checkout@v4
-
       - name: Get latest riscv-gnu-toolchain release
         id: get_version
         run: |
@@ -23,6 +20,21 @@ jobs:
           LATEST_TAG=$(curl -s https://api.github.com/repos/riscv-collab/riscv-gnu-toolchain/releases | jq -r '.[0].tag_name')
           echo "release_tag=${LATEST_TAG}" >> $GITHUB_OUTPUT
           echo "Latest release tag: ${LATEST_TAG}"
+
+  build:
+    needs: get-version
+    runs-on: ubuntu-22.04
+    timeout-minutes: 480  # 8 hours max for build
+    strategy:
+      matrix:
+        variant:
+          - { arch: rv32imac, abi: ilp32, name: "soft-float", fpu: "no FPU" }
+          - { arch: rv32imafc, abi: ilp32f, name: "single-precision", fpu: "single-precision FPU" }
+          - { arch: rv32gc, abi: ilp32d, name: "double-precision", fpu: "double-precision FPU" }
+
+    steps:
+      - name: Checkout this repository
+        uses: actions/checkout@v4
 
       - name: Install build dependencies
         run: |
@@ -35,7 +47,7 @@ jobs:
 
       - name: Clone riscv-gnu-toolchain
         run: |
-          git clone --depth 1 --branch ${{ steps.get_version.outputs.release_tag }} https://github.com/riscv-collab/riscv-gnu-toolchain.git
+          git clone --depth 1 --branch ${{ needs.get-version.outputs.release_tag }} https://github.com/riscv-collab/riscv-gnu-toolchain.git
 
       - name: Free up disk space
         run: |
@@ -47,48 +59,38 @@ jobs:
           sudo docker image prune --all --force
           df -h
 
-      - name: Configure toolchain for common rv32 variants with multilib
+      - name: Configure toolchain for ${{ matrix.variant.arch }}/${{ matrix.variant.abi }}
         run: |
           cd riscv-gnu-toolchain
 
-          # Create multilib generator configuration for common rv32 variants
-          # Focus on most commonly used configurations to save disk space
-          MULTILIB_GEN="rv32imac-ilp32--;rv32imafc-ilp32f--;rv32gc-ilp32d--"
-
           ./configure \
-            --prefix=/opt/riscv32 \
-            --enable-multilib \
-            --with-multilib-generator="${MULTILIB_GEN}" \
+            --prefix=/opt/riscv32-${{ matrix.variant.abi }} \
+            --with-arch=${{ matrix.variant.arch }} \
+            --with-abi=${{ matrix.variant.abi }} \
             --enable-languages=c,c++ \
-            --disable-gdb
+            --disable-gdb \
+            --disable-multilib
 
       - name: Build Linux toolchain
         run: |
           cd riscv-gnu-toolchain
-          # Build all multilib variants
           make linux -j$(nproc)
 
-      - name: Verify multilib libraries
+      - name: Verify installation
         run: |
-          set +e  # Don't fail on errors, just report what we find
-          echo "Checking installed multilib variants:"
-          find /opt/riscv32 -name "libc.so*" -o -name "libgcc.a" | sort
+          echo "Checking installed libraries:"
+          find /opt/riscv32-${{ matrix.variant.abi }} -name "libc.so*" -o -name "libgcc.a" | sort
           echo ""
-          echo "Checking multilib configurations:"
-          /opt/riscv32/bin/riscv32-unknown-linux-gnu-gcc -print-multi-lib
+          echo "Checking compiler:"
+          /opt/riscv32-${{ matrix.variant.abi }}/bin/riscv32-unknown-linux-gnu-gcc --version
           echo ""
-          echo "Checking sysroot structure:"
-          ls -la /opt/riscv32/sysroot/lib/
-          echo ""
-          echo "Checking for stub files:"
-          ls -la /opt/riscv32/sysroot/usr/include/gnu/stubs*.h 2>&1 || echo "Some stub files may be missing"
-          echo ""
-          echo "Verification complete (non-fatal)"
+          echo "Checking sysroot:"
+          ls -la /opt/riscv32-${{ matrix.variant.abi }}/sysroot/lib/
 
       - name: Create DEB package structure
         run: |
-          PKG_NAME="riscv32-gnu-toolchain-multilib"
-          PKG_VERSION="${{ steps.get_version.outputs.release_tag }}"
+          PKG_NAME="riscv32-gnu-toolchain-${{ matrix.variant.abi }}"
+          PKG_VERSION="${{ needs.get-version.outputs.release_tag }}"
           PKG_ARCH="amd64"
           PKG_DIR="${PKG_NAME}_${PKG_VERSION}_${PKG_ARCH}"
 
@@ -97,7 +99,7 @@ jobs:
           mkdir -p "${PKG_DIR}/opt"
 
           # Copy installed toolchain
-          cp -r /opt/riscv32 "${PKG_DIR}/opt/"
+          cp -r /opt/riscv32-${{ matrix.variant.abi }} "${PKG_DIR}/opt/"
 
           # Get installed size in KB
           INSTALLED_SIZE=$(du -sk "${PKG_DIR}/opt" | cut -f1)
@@ -111,50 +113,34 @@ jobs:
           Architecture: ${PKG_ARCH}
           Installed-Size: ${INSTALLED_SIZE}
           Maintainer: GitHub Actions <noreply@github.com>
-          Description: RISC-V GNU Toolchain for rv32 variants (Linux/ELF)
-           Cross-compilation toolchain for RISC-V 32-bit targets with multilib support.
-           Built from riscv-gnu-toolchain ${{ steps.get_version.outputs.release_tag }}.
+          Description: RISC-V GNU Toolchain for ${{ matrix.variant.arch }}/${{ matrix.variant.abi }} (Linux/ELF)
+           Cross-compilation toolchain for RISC-V 32-bit ${{ matrix.variant.arch }} architecture
+           with ${{ matrix.variant.abi }} ABI (${{ matrix.variant.fpu }}).
+           Built from riscv-gnu-toolchain ${{ needs.get-version.outputs.release_tag }}.
            .
-           Supports common rv32 architecture variants:
-           - rv32imac (no FPU, with compressed instructions)
-           - rv32imafc (single-precision FPU)
-           - rv32gc (double-precision FPU)
-           .
-           Languages: C and C++ (Fortran disabled to save space)
-           .
-           Includes libraries for variants with appropriate ABIs:
-           - ilp32 (soft-float)
-           - ilp32f (single-precision hardware float)
-           - ilp32d (double-precision hardware float)
+           Architecture: ${{ matrix.variant.arch }} (${{ matrix.variant.name }})
+           ABI: ${{ matrix.variant.abi }}
+           FPU: ${{ matrix.variant.fpu }}
+           Languages: C and C++
           Homepage: https://github.com/riscv-collab/riscv-gnu-toolchain
           EOF
 
           # Create postinst script
-          cat > "${PKG_DIR}/DEBIAN/postinst" <<'EOF'
+          cat > "${PKG_DIR}/DEBIAN/postinst" <<'POSTINST_EOF'
           #!/bin/bash
           set -e
 
           echo "=========================================="
-          echo "RISC-V GNU Toolchain installed to /opt/riscv32"
+          echo "RISC-V GNU Toolchain installed to /opt/riscv32-${{ matrix.variant.abi }}"
           echo "=========================================="
           echo ""
-          echo "Add /opt/riscv32/bin to your PATH to use the toolchain:"
-          echo "  export PATH=/opt/riscv32/bin:\$PATH"
+          echo "Add /opt/riscv32-${{ matrix.variant.abi }}/bin to your PATH to use the toolchain:"
+          echo "  export PATH=/opt/riscv32-${{ matrix.variant.abi }}/bin:\$PATH"
           echo ""
-          echo "Check available multilib variants:"
-          echo "  riscv32-unknown-linux-gnu-gcc -print-multi-lib"
+          echo "Usage example:"
+          echo "  riscv32-unknown-linux-gnu-gcc -march=${{ matrix.variant.arch }} -mabi=${{ matrix.variant.abi }} -o app app.c"
           echo ""
-          echo "Usage examples:"
-          echo "  # rv32imac (no FPU, soft-float):"
-          echo "  riscv32-unknown-linux-gnu-gcc -march=rv32imac -mabi=ilp32 -o app app.c"
-          echo ""
-          echo "  # rv32imafc (single-precision FPU):"
-          echo "  riscv32-unknown-linux-gnu-gcc -march=rv32imafc -mabi=ilp32f -o app app.c"
-          echo ""
-          echo "  # rv32gc (double-precision FPU, default):"
-          echo "  riscv32-unknown-linux-gnu-gcc -march=rv32gc -mabi=ilp32d -o app app.c"
-          echo ""
-          EOF
+          POSTINST_EOF
 
           chmod 755 "${PKG_DIR}/DEBIAN/postinst"
 
@@ -165,6 +151,7 @@ jobs:
           echo "deb_file=${PKG_DIR}.deb" >> $GITHUB_ENV
           echo "pkg_version=${PKG_VERSION}" >> $GITHUB_ENV
           echo "pkg_name=${PKG_NAME}" >> $GITHUB_ENV
+          echo "variant_abi=${{ matrix.variant.abi }}" >> $GITHUB_ENV
 
       - name: Generate package info
         run: |
@@ -179,67 +166,91 @@ jobs:
           path: "*.deb"
           retention-days: 90
 
+  create-release:
+    needs: [get-version, build]
+    runs-on: ubuntu-22.04
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: packages
+
+      - name: Display structure of downloaded files
+        run: ls -R packages
+
+      - name: Move packages to root
+        run: |
+          mkdir -p release-packages
+          find packages -name "*.deb" -exec mv {} release-packages/ \;
+          ls -lh release-packages/
+
       - name: Create Release
-        if: github.event_name == 'workflow_dispatch'
         uses: softprops/action-gh-release@v2
         with:
           repository: ${{ github.repository }}
-          tag_name: riscv-toolchain-${{ steps.get_version.outputs.release_tag }}
-          name: RISC-V GNU Toolchain ${{ steps.get_version.outputs.release_tag }}
+          tag_name: riscv-toolchain-${{ needs.get-version.outputs.release_tag }}
+          name: RISC-V GNU Toolchain ${{ needs.get-version.outputs.release_tag }}
           body: |
-            # RISC-V GNU Toolchain DEB Package (rv32 Common Variants)
+            # RISC-V GNU Toolchain DEB Packages (rv32 Variants)
 
-            Based on upstream release: **${{ steps.get_version.outputs.release_tag }}**
+            Based on upstream release: **${{ needs.get-version.outputs.release_tag }}**
 
-            ## Supported Architectures
+            ## Packages
 
-            This package includes multilib support for common rv32 variants:
+            This release includes three separate packages, one for each ABI variant:
 
-            | Architecture | Extensions | ABI | FPU Support | Use Case |
-            |-------------|------------|-----|-------------|----------|
-            | rv32imac | Integer, Multiply, Atomics, Compressed | ilp32 | None (soft-float) | Embedded, no FPU |
-            | rv32imafc | + Single-precision FP | ilp32f | Single-precision | DSP, light FP work |
-            | rv32gc | Full (imafdc) | ilp32d | Double-precision | General purpose |
+            | Package | Architecture | ABI | FPU Support | Use Case |
+            |---------|-------------|-----|-------------|----------|
+            | riscv32-gnu-toolchain-ilp32 | rv32imac | ilp32 | None (soft-float) | Embedded, no FPU |
+            | riscv32-gnu-toolchain-ilp32f | rv32imafc | ilp32f | Single-precision | DSP, light FP work |
+            | riscv32-gnu-toolchain-ilp32d | rv32gc | ilp32d | Double-precision | General purpose |
 
-            **Languages**: C and C++ (Fortran disabled to reduce package size)
+            **Languages**: C and C++
 
             ## Installation
 
+            Install the variant you need:
+
             ```bash
-            sudo dpkg -i ${{ env.deb_file }}
-            export PATH=/opt/riscv/bin:$PATH
+            # For soft-float (no FPU):
+            sudo dpkg -i riscv32-gnu-toolchain-ilp32_${{ needs.get-version.outputs.release_tag }}_amd64.deb
+            export PATH=/opt/riscv32-ilp32/bin:$PATH
+
+            # For single-precision FPU:
+            sudo dpkg -i riscv32-gnu-toolchain-ilp32f_${{ needs.get-version.outputs.release_tag }}_amd64.deb
+            export PATH=/opt/riscv32-ilp32f/bin:$PATH
+
+            # For double-precision FPU (most common):
+            sudo dpkg -i riscv32-gnu-toolchain-ilp32d_${{ needs.get-version.outputs.release_tag }}_amd64.deb
+            export PATH=/opt/riscv32-ilp32d/bin:$PATH
             ```
+
+            You can install multiple packages side-by-side as they install to different directories.
 
             ## Usage Examples
 
-            ### No FPU (soft-float) - rv32imac
+            ### Soft-float (rv32imac/ilp32)
             ```bash
-            riscv32-unknown-linux-gnu-gcc -march=rv32imac -mabi=ilp32 -o hello hello.c
+            /opt/riscv32-ilp32/bin/riscv32-unknown-linux-gnu-gcc -march=rv32imac -mabi=ilp32 -o hello hello.c
             ```
 
-            ### Single-precision FPU - rv32imafc
+            ### Single-precision FPU (rv32imafc/ilp32f)
             ```bash
-            riscv32-unknown-linux-gnu-gcc -march=rv32imafc -mabi=ilp32f -o hello hello.c
+            /opt/riscv32-ilp32f/bin/riscv32-unknown-linux-gnu-gcc -march=rv32imafc -mabi=ilp32f -o hello hello.c
             ```
 
-            ### Double-precision FPU - rv32gc
+            ### Double-precision FPU (rv32gc/ilp32d)
             ```bash
-            riscv32-unknown-linux-gnu-gcc -march=rv32gc -mabi=ilp32d -o hello hello.c
-            ```
-
-            ## Verification
-
-            Check available multilibs:
-            ```bash
-            riscv32-unknown-linux-gnu-gcc --print-multi-lib
+            /opt/riscv32-ilp32d/bin/riscv32-unknown-linux-gnu-gcc -march=rv32gc -mabi=ilp32d -o hello hello.c
             ```
 
             ## Target Details
             - **Platform**: Linux (ELF)
-            - **Bit width**: 32-bit only
-            - **Multilib**: Enabled for all rv32 variants
+            - **Bit width**: 32-bit
+            - **Multilib**: Disabled (each variant is a separate package)
             - **Toolchain prefix**: riscv32-unknown-linux-gnu-
-          files: "*.deb"
+          files: release-packages/*.deb
           draft: false
           prerelease: false
         env:
