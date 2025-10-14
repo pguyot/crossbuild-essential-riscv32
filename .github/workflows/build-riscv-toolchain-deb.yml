@@ -29,7 +29,6 @@ jobs:
       matrix:
         variant:
           - { arch: rv32imac, abi: ilp32, name: "soft-float", fpu: "no FPU" }
-          - { arch: rv32imafc, abi: ilp32f, name: "single-precision", fpu: "single-precision FPU" }
           - { arch: rv32gc, abi: ilp32d, name: "double-precision", fpu: "double-precision FPU" }
 
     steps:
@@ -198,13 +197,14 @@ jobs:
 
             ## Packages
 
-            This release includes three separate packages, one for each ABI variant:
+            This release includes two separate packages, one for each supported ABI variant:
 
             | Package | Architecture | ABI | FPU Support | Use Case |
             |---------|-------------|-----|-------------|----------|
             | riscv32-gnu-toolchain-ilp32 | rv32imac | ilp32 | None (soft-float) | Embedded, no FPU |
-            | riscv32-gnu-toolchain-ilp32f | rv32imafc | ilp32f | Single-precision | DSP, light FP work |
             | riscv32-gnu-toolchain-ilp32d | rv32gc | ilp32d | Double-precision | General purpose |
+
+            **Note**: ilp32f (single-precision FPU) is not included as it's not supported by glibc.
 
             **Languages**: C and C++
 
@@ -217,27 +217,18 @@ jobs:
             sudo dpkg -i riscv32-gnu-toolchain-ilp32_${{ needs.get-version.outputs.release_tag }}_amd64.deb
             export PATH=/opt/riscv32-ilp32/bin:$PATH
 
-            # For single-precision FPU:
-            sudo dpkg -i riscv32-gnu-toolchain-ilp32f_${{ needs.get-version.outputs.release_tag }}_amd64.deb
-            export PATH=/opt/riscv32-ilp32f/bin:$PATH
-
             # For double-precision FPU (most common):
             sudo dpkg -i riscv32-gnu-toolchain-ilp32d_${{ needs.get-version.outputs.release_tag }}_amd64.deb
             export PATH=/opt/riscv32-ilp32d/bin:$PATH
             ```
 
-            You can install multiple packages side-by-side as they install to different directories.
+            Both packages can be installed side-by-side as they install to different directories.
 
             ## Usage Examples
 
             ### Soft-float (rv32imac/ilp32)
             ```bash
             /opt/riscv32-ilp32/bin/riscv32-unknown-linux-gnu-gcc -march=rv32imac -mabi=ilp32 -o hello hello.c
-            ```
-
-            ### Single-precision FPU (rv32imafc/ilp32f)
-            ```bash
-            /opt/riscv32-ilp32f/bin/riscv32-unknown-linux-gnu-gcc -march=rv32imafc -mabi=ilp32f -o hello hello.c
             ```
 
             ### Double-precision FPU (rv32gc/ilp32d)
