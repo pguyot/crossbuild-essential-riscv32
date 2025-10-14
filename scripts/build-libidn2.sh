@@ -1,18 +1,20 @@
 #!/bin/bash
 set -euo pipefail
 
+MABI=$1
+MARCH=$2
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/common.sh"
 
-# libidn2 build uses the riscv32 toolchain from common.sh
-# CC, AR, RANLIB, CFLAGS, etc. are already set by common.sh
+log_info "Building libidn2 for ${ARCH} (${MARCH};${MABI})"
+
+# Define ABI-specific library path
+LIB_DIR="${TARGET}-${MABI}"
 
 LIBIDN2_VERSION=2.3.7
-PACKAGE_NAME=libidn2-0-riscv32-cross
 BUILD_DIR=$(pwd)/build/libidn2
-INSTALL_DIR=$(pwd)/build/${PACKAGE_NAME}
-
-log_info "Building libidn2 for ${TARGET}"
+INSTALL_DIR=$(pwd)/build/libidn2-${MABI}
 
 # Get libidn2 source from Ubuntu
 if [ ! -d "libidn2-${LIBIDN2_VERSION}" ]; then
@@ -39,13 +41,12 @@ cd libidn2-${LIBIDN2_VERSION}
 # Configure and build libidn2
 log_info "Configuring libidn2..."
 ./configure \
-    --prefix=${PREFIX} \
+    --prefix=/usr \
     --host=${TARGET} \
     --build=x86_64-linux-gnu \
     CC="${CC}" \
-    CFLAGS="${CFLAGS}" \
-    LDFLAGS="${LDFLAGS} -L${PREFIX}/lib" \
-    --with-libunistring-prefix=${PREFIX} \
+    CFLAGS="${CFLAGS} -I$(pwd)/../build/libunistring-${MABI}/usr/include/${LIB_DIR}" \
+    LDFLAGS="${LDFLAGS} -L$(pwd)/../build/libunistring-${MABI}/usr/lib/${LIB_DIR}" \
     --disable-static \
     --enable-shared
 
@@ -58,34 +59,36 @@ rm -rf ${INSTALL_DIR}
 mkdir -p ${INSTALL_DIR}
 make install DESTDIR=${INSTALL_DIR}
 
-# Create runtime package (libidn2-0-riscv32-cross)
-log_info "Creating libidn2-0-riscv32-cross package..."
-RUNTIME_DIR=$(pwd)/../build/libidn2-0-riscv32-cross-runtime
+# Create runtime package with ABI-specific name
+PKG_NAME="libidn2-0-${MABI}"
+log_info "Creating ${PKG_NAME} package..."
+cd ..
+RUNTIME_DIR=$(pwd)/build/${PKG_NAME}
 mkdir -p ${RUNTIME_DIR}/DEBIAN
-mkdir -p ${RUNTIME_DIR}${PREFIX}/lib
+mkdir -p ${RUNTIME_DIR}/usr/lib/${LIB_DIR}
 
 # Copy runtime libraries
-cp -a ${INSTALL_DIR}${PREFIX}/lib/*.so* ${RUNTIME_DIR}${PREFIX}/lib/ || true
+cp -a ${INSTALL_DIR}/usr/lib/*.so* ${RUNTIME_DIR}/usr/lib/${LIB_DIR}/ || true
 
 cat > ${RUNTIME_DIR}/DEBIAN/control << EOF
-Package: libidn2-0-riscv32-cross
+Package: ${PKG_NAME}
+Architecture: ${ARCH}
 Version: ${LIBIDN2_VERSION}-0ubuntu1
+Multi-Arch: same
 Section: libs
 Priority: optional
-Architecture: all
-Depends: libunistring5-riscv32-cross
+Depends: libunistring5-${MABI}
 Maintainer: ${MAINTAINER}
-Description: Internationalized domain names (IDNA2008/TR46) library (for RISC-V 32-bit)
+Description: Internationalized domain names (IDNA2008/TR46) library (${ARCH} ${MARCH}-${MABI} cross-compile)
  Libidn2 implements the revised algorithm for internationalized domain
  names called IDNA2008/TR46.
  .
- This package contains the shared library for RISC-V 32-bit.
+ This package contains the shared library for RISC-V 32-bit (${MARCH};${MABI}).
  .
  This package is for cross-compiling.
 EOF
 
-cd ..
-dpkg-deb --build ${RUNTIME_DIR} build/libidn2-0-riscv32-cross_${LIBIDN2_VERSION}-0ubuntu1_all.deb
-log_info "Created: libidn2-0-riscv32-cross_${LIBIDN2_VERSION}-0ubuntu1_all.deb"
+dpkg-deb --build ${RUNTIME_DIR} build/${PKG_NAME}_${LIBIDN2_VERSION}-0ubuntu1_${ARCH}.deb
+log_info "Created: ${PKG_NAME}_${LIBIDN2_VERSION}-0ubuntu1_${ARCH}.deb"
 
 log_info "libidn2 build complete!"

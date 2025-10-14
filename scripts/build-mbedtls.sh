@@ -1,18 +1,24 @@
 #!/bin/bash
 set -euo pipefail
 
+MABI=$1
+MARCH=$2
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/common.sh"
 
 # mbedtls build uses the riscv32 toolchain from common.sh
 # CC, AR, RANLIB, CFLAGS, etc. are already set by common.sh
 
+# Define ABI-specific library path
+LIB_DIR="${TARGET}-${MABI}"
+
 MBEDTLS_VERSION=2.28.8
-PACKAGE_NAME=libmbedtls-riscv32-cross
+PACKAGE_NAME=libmbedtls-${MABI}
 BUILD_DIR=$(pwd)/build/mbedtls
 INSTALL_DIR=$(pwd)/build/${PACKAGE_NAME}
 
-log_info "Building mbedtls for ${TARGET}"
+log_info "Building mbedtls for ${ARCH} (${MARCH};${MABI})"
 
 # Get mbedtls source from Ubuntu
 if [ ! -d "mbedtls-${MBEDTLS_VERSION}" ]; then
@@ -60,116 +66,118 @@ rm -rf ${INSTALL_DIR}
 mkdir -p ${INSTALL_DIR}
 make install DESTDIR=${INSTALL_DIR}
 
-# Create libmbedcrypto package
-log_info "Creating libmbedcrypto7-riscv32-cross package..."
+# Create libmbedcrypto package with ABI-specific name
+PKG_CRYPTO="libmbedcrypto7-${MABI}"
+log_info "Creating ${PKG_CRYPTO} package..."
 cd ../..
-CRYPTO_DIR=$(pwd)/build/libmbedcrypto7-riscv32-cross
+CRYPTO_DIR=$(pwd)/build/${PKG_CRYPTO}
 mkdir -p ${CRYPTO_DIR}/DEBIAN
-mkdir -p ${CRYPTO_DIR}${PREFIX}/lib
+mkdir -p ${CRYPTO_DIR}/usr/lib/${LIB_DIR}
 
-cp -a ${INSTALL_DIR}${PREFIX}/lib/libmbedcrypto.so* ${CRYPTO_DIR}${PREFIX}/lib/ || true
+cp -a ${INSTALL_DIR}${PREFIX}/lib/libmbedcrypto.so* ${CRYPTO_DIR}/usr/lib/${LIB_DIR}/ || true
 
 cat > ${CRYPTO_DIR}/DEBIAN/control << EOF
-Package: libmbedcrypto7-riscv32-cross
+Package: ${PKG_CRYPTO}
+Architecture: ${ARCH}
 Version: ${MBEDTLS_VERSION}-0ubuntu1
+Multi-Arch: same
 Section: libs
 Priority: optional
-Architecture: all
 Maintainer: ${MAINTAINER}
-Description: lightweight crypto library - runtime (for RISC-V 32-bit)
- mbed TLS crypto library for cryptographic operations.
- .
- This package contains the shared crypto library for RISC-V 32-bit.
+Description: lightweight crypto library - runtime (${ARCH} ${MARCH}-${MABI} cross-compile)
+ mbed TLS crypto library for cryptographic operations for RISC-V 32-bit (${MARCH};${MABI}).
  .
  This package is for cross-compiling.
 EOF
 
-dpkg-deb --build ${CRYPTO_DIR} build/libmbedcrypto7-riscv32-cross_${MBEDTLS_VERSION}-0ubuntu1_all.deb
-log_info "Created: libmbedcrypto7-riscv32-cross_${MBEDTLS_VERSION}-0ubuntu1_all.deb"
+dpkg-deb --build ${CRYPTO_DIR} build/${PKG_CRYPTO}_${MBEDTLS_VERSION}-0ubuntu1_${ARCH}.deb
+log_info "Created: ${PKG_CRYPTO}_${MBEDTLS_VERSION}-0ubuntu1_${ARCH}.deb"
 
-# Create libmbedx509 package
-log_info "Creating libmbedx509-1-riscv32-cross package..."
-X509_DIR=$(pwd)/build/libmbedx509-1-riscv32-cross
+# Create libmbedx509 package with ABI-specific name
+PKG_X509="libmbedx509-1-${MABI}"
+log_info "Creating ${PKG_X509} package..."
+X509_DIR=$(pwd)/build/${PKG_X509}
 mkdir -p ${X509_DIR}/DEBIAN
-mkdir -p ${X509_DIR}${PREFIX}/lib
+mkdir -p ${X509_DIR}/usr/lib/${LIB_DIR}
 
-cp -a ${INSTALL_DIR}${PREFIX}/lib/libmbedx509.so* ${X509_DIR}${PREFIX}/lib/ || true
+cp -a ${INSTALL_DIR}${PREFIX}/lib/libmbedx509.so* ${X509_DIR}/usr/lib/${LIB_DIR}/ || true
 
 cat > ${X509_DIR}/DEBIAN/control << EOF
-Package: libmbedx509-1-riscv32-cross
+Package: ${PKG_X509}
+Architecture: ${ARCH}
 Version: ${MBEDTLS_VERSION}-0ubuntu1
+Multi-Arch: same
 Section: libs
 Priority: optional
-Architecture: all
-Depends: libmbedcrypto7-riscv32-cross (= ${MBEDTLS_VERSION}-0ubuntu1)
+Depends: ${PKG_CRYPTO} (= ${MBEDTLS_VERSION}-0ubuntu1)
 Maintainer: ${MAINTAINER}
-Description: lightweight X.509 certificate library - runtime (for RISC-V 32-bit)
- mbed TLS X.509 certificate handling library.
- .
- This package contains the shared X.509 library for RISC-V 32-bit.
+Description: lightweight X.509 certificate library - runtime (${ARCH} ${MARCH}-${MABI} cross-compile)
+ mbed TLS X.509 certificate handling library for RISC-V 32-bit (${MARCH};${MABI}).
  .
  This package is for cross-compiling.
 EOF
 
-dpkg-deb --build ${X509_DIR} build/libmbedx509-1-riscv32-cross_${MBEDTLS_VERSION}-0ubuntu1_all.deb
-log_info "Created: libmbedx509-1-riscv32-cross_${MBEDTLS_VERSION}-0ubuntu1_all.deb"
+dpkg-deb --build ${X509_DIR} build/${PKG_X509}_${MBEDTLS_VERSION}-0ubuntu1_${ARCH}.deb
+log_info "Created: ${PKG_X509}_${MBEDTLS_VERSION}-0ubuntu1_${ARCH}.deb"
 
-# Create libmbedtls package
-log_info "Creating libmbedtls14-riscv32-cross package..."
-TLS_DIR=$(pwd)/build/libmbedtls14-riscv32-cross
+# Create libmbedtls package with ABI-specific name
+PKG_TLS="libmbedtls14-${MABI}"
+log_info "Creating ${PKG_TLS} package..."
+TLS_DIR=$(pwd)/build/${PKG_TLS}
 mkdir -p ${TLS_DIR}/DEBIAN
-mkdir -p ${TLS_DIR}${PREFIX}/lib
+mkdir -p ${TLS_DIR}/usr/lib/${LIB_DIR}
 
-cp -a ${INSTALL_DIR}${PREFIX}/lib/libmbedtls.so* ${TLS_DIR}${PREFIX}/lib/ || true
+cp -a ${INSTALL_DIR}${PREFIX}/lib/libmbedtls.so* ${TLS_DIR}/usr/lib/${LIB_DIR}/ || true
 
 cat > ${TLS_DIR}/DEBIAN/control << EOF
-Package: libmbedtls14-riscv32-cross
+Package: ${PKG_TLS}
+Architecture: ${ARCH}
 Version: ${MBEDTLS_VERSION}-0ubuntu1
+Multi-Arch: same
 Section: libs
 Priority: optional
-Architecture: all
-Depends: libmbedcrypto7-riscv32-cross (= ${MBEDTLS_VERSION}-0ubuntu1), libmbedx509-1-riscv32-cross (= ${MBEDTLS_VERSION}-0ubuntu1)
+Depends: ${PKG_CRYPTO} (= ${MBEDTLS_VERSION}-0ubuntu1), ${PKG_X509} (= ${MBEDTLS_VERSION}-0ubuntu1)
 Maintainer: ${MAINTAINER}
-Description: lightweight SSL/TLS library - runtime (for RISC-V 32-bit)
- mbed TLS TLS/SSL protocol implementation library.
- .
- This package contains the shared TLS library for RISC-V 32-bit.
+Description: lightweight SSL/TLS library - runtime (${ARCH} ${MARCH}-${MABI} cross-compile)
+ mbed TLS TLS/SSL protocol implementation library for RISC-V 32-bit (${MARCH};${MABI}).
  .
  This package is for cross-compiling.
 EOF
 
-dpkg-deb --build ${TLS_DIR} build/libmbedtls14-riscv32-cross_${MBEDTLS_VERSION}-0ubuntu1_all.deb
-log_info "Created: libmbedtls14-riscv32-cross_${MBEDTLS_VERSION}-0ubuntu1_all.deb"
+dpkg-deb --build ${TLS_DIR} build/${PKG_TLS}_${MBEDTLS_VERSION}-0ubuntu1_${ARCH}.deb
+log_info "Created: ${PKG_TLS}_${MBEDTLS_VERSION}-0ubuntu1_${ARCH}.deb"
 
-# Create development package (libmbedtls-dev-riscv32-cross)
-log_info "Creating libmbedtls-dev-riscv32-cross package..."
-DEV_DIR=$(pwd)/build/libmbedtls-dev-riscv32-cross
+# Create development package with ABI-specific name
+PKG_DEV="libmbedtls-dev-${MABI}"
+log_info "Creating ${PKG_DEV} package..."
+DEV_DIR=$(pwd)/build/${PKG_DEV}
 mkdir -p ${DEV_DIR}/DEBIAN
-mkdir -p ${DEV_DIR}${PREFIX}
+mkdir -p ${DEV_DIR}/usr/lib/${LIB_DIR}
+mkdir -p ${DEV_DIR}/usr/include/${LIB_DIR}
 
 # Copy development files
-cp -a ${INSTALL_DIR}${PREFIX}/include ${DEV_DIR}${PREFIX}/ || true
-mkdir -p ${DEV_DIR}${PREFIX}/lib
-cp -a ${INSTALL_DIR}${PREFIX}/lib/*.a ${DEV_DIR}${PREFIX}/lib/ || true
+cp -a ${INSTALL_DIR}${PREFIX}/include/* ${DEV_DIR}/usr/include/${LIB_DIR}/ || true
+cp -a ${INSTALL_DIR}${PREFIX}/lib/*.a ${DEV_DIR}/usr/lib/${LIB_DIR}/ || true
 
 cat > ${DEV_DIR}/DEBIAN/control << EOF
-Package: libmbedtls-dev-riscv32-cross
+Package: ${PKG_DEV}
+Architecture: ${ARCH}
 Version: ${MBEDTLS_VERSION}-0ubuntu1
+Multi-Arch: same
 Section: libdevel
 Priority: optional
-Architecture: all
-Depends: libmbedtls14-riscv32-cross (= ${MBEDTLS_VERSION}-0ubuntu1), libmbedcrypto7-riscv32-cross (= ${MBEDTLS_VERSION}-0ubuntu1), libmbedx509-1-riscv32-cross (= ${MBEDTLS_VERSION}-0ubuntu1), libc6-dev-riscv32-cross
+Depends: ${PKG_TLS} (= ${MBEDTLS_VERSION}-0ubuntu1), ${PKG_CRYPTO} (= ${MBEDTLS_VERSION}-0ubuntu1), ${PKG_X509} (= ${MBEDTLS_VERSION}-0ubuntu1), libc6-dev-${MABI}
 Maintainer: ${MAINTAINER}
-Description: lightweight crypto and SSL/TLS library - development (for RISC-V 32-bit)
+Description: lightweight crypto and SSL/TLS library - development (${ARCH} ${MARCH}-${MABI} cross-compile)
  mbed TLS (formerly known as PolarSSL) makes it easy for developers to include
  cryptographic and SSL/TLS capabilities in their embedded products.
  .
- This package contains the development files for RISC-V 32-bit.
+ This package contains the development files for RISC-V 32-bit (${MARCH};${MABI}).
  .
  This package is for cross-compiling.
 EOF
 
-dpkg-deb --build ${DEV_DIR} build/libmbedtls-dev-riscv32-cross_${MBEDTLS_VERSION}-0ubuntu1_all.deb
-log_info "Created: libmbedtls-dev-riscv32-cross_${MBEDTLS_VERSION}-0ubuntu1_all.deb"
+dpkg-deb --build ${DEV_DIR} build/${PKG_DEV}_${MBEDTLS_VERSION}-0ubuntu1_${ARCH}.deb
+log_info "Created: ${PKG_DEV}_${MBEDTLS_VERSION}-0ubuntu1_${ARCH}.deb"
 
 log_info "mbedtls build complete!"
