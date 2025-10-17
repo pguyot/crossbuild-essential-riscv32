@@ -1,18 +1,20 @@
 #!/bin/bash
 set -euo pipefail
 
+MABI=$1
+MARCH=$2
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/common.sh"
 
-# libunistring build uses the riscv32 toolchain from common.sh
-# CC, AR, RANLIB, CFLAGS, etc. are already set by common.sh
+log_info "Building libunistring for ${ARCH} (${MARCH};${MABI})"
+
+# Define ABI-specific library path
+LIB_DIR="${TARGET}-${MABI}"
 
 LIBUNISTRING_VERSION=1.1
-PACKAGE_NAME=libunistring5-riscv32-cross
 BUILD_DIR=$(pwd)/build/libunistring
-INSTALL_DIR=$(pwd)/build/${PACKAGE_NAME}
-
-log_info "Building libunistring for ${TARGET}"
+INSTALL_DIR=$(pwd)/build/libunistring-${MABI}
 
 # Get libunistring source from Ubuntu
 if [ ! -d "libunistring-${LIBUNISTRING_VERSION}" ]; then
@@ -39,7 +41,7 @@ cd libunistring-${LIBUNISTRING_VERSION}
 # Configure and build libunistring
 log_info "Configuring libunistring..."
 ./configure \
-    --prefix=${PREFIX} \
+    --prefix=/usr \
     --host=${TARGET} \
     --build=x86_64-linux-gnu \
     CC="${CC}" \
@@ -56,36 +58,38 @@ rm -rf ${INSTALL_DIR}
 mkdir -p ${INSTALL_DIR}
 make install DESTDIR=${INSTALL_DIR}
 
-# Create runtime package (libunistring5-riscv32-cross)
-log_info "Creating libunistring5-riscv32-cross package..."
-RUNTIME_DIR=$(pwd)/../build/libunistring5-riscv32-cross-runtime
+# Create runtime package with ABI-specific name
+PKG_NAME="libunistring5-${MABI}"
+log_info "Creating ${PKG_NAME} package..."
+cd ..
+RUNTIME_DIR=$(pwd)/build/${PKG_NAME}
 mkdir -p ${RUNTIME_DIR}/DEBIAN
-mkdir -p ${RUNTIME_DIR}${PREFIX}/lib
+mkdir -p ${RUNTIME_DIR}/usr/lib/${LIB_DIR}
 
 # Copy runtime libraries
-cp -a ${INSTALL_DIR}${PREFIX}/lib/*.so* ${RUNTIME_DIR}${PREFIX}/lib/ || true
+cp -a ${INSTALL_DIR}/usr/lib/*.so* ${RUNTIME_DIR}/usr/lib/${LIB_DIR}/ || true
 
 cat > ${RUNTIME_DIR}/DEBIAN/control << EOF
-Package: libunistring5-riscv32-cross
+Package: ${PKG_NAME}
+Architecture: ${ARCH}
 Version: ${LIBUNISTRING_VERSION}-0ubuntu1
+Multi-Arch: same
 Section: libs
 Priority: optional
-Architecture: all
 Maintainer: ${MAINTAINER}
-Description: Unicode string library for C (for RISC-V 32-bit cross-compiling)
+Description: Unicode string library for C (${ARCH} ${MARCH}-${MABI} cross-compile)
  The 'libunistring' library implements Unicode strings (in the UTF-8,
  UTF-16, and UTF-32 encodings), together with functions for Unicode
  characters (character names, classifications, properties) and
  functions for string processing (formatted output, width, word breaks,
  line breaks, normalization, case folding, regular expressions).
  .
- This package contains the shared library for RISC-V 32-bit.
+ This package contains the shared library for RISC-V 32-bit (${MARCH};${MABI}).
  .
  This package is for cross-compiling.
 EOF
 
-cd ..
-dpkg-deb --build ${RUNTIME_DIR} build/libunistring5-riscv32-cross_${LIBUNISTRING_VERSION}-0ubuntu1_all.deb
-log_info "Created: libunistring5-riscv32-cross_${LIBUNISTRING_VERSION}-0ubuntu1_all.deb"
+dpkg-deb --build ${RUNTIME_DIR} build/${PKG_NAME}_${LIBUNISTRING_VERSION}-0ubuntu1_${ARCH}.deb
+log_info "Created: ${PKG_NAME}_${LIBUNISTRING_VERSION}-0ubuntu1_${ARCH}.deb"
 
 log_info "libunistring build complete!"

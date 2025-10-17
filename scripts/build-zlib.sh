@@ -1,18 +1,22 @@
 #!/bin/bash
 set -euo pipefail
 
+MABI=$1
+MARCH=$2
+
+# Source common functions
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/common.sh"
 
-# zlib build uses the riscv32 toolchain from common.sh
-# CC, AR, RANLIB, CFLAGS, etc. are already set by common.sh
+log_info "Building zlib for ${ARCH} (${MARCH};${MABI})"
+
+# Define ABI-specific library path
+LIB_DIR="${TARGET}-${MABI}"
 
 ZLIB_VERSION=1.3.1
-PACKAGE_NAME=zlib1g-riscv32-cross
+PACKAGE_NAME=zlib1g-${MABI}
 BUILD_DIR=$(pwd)/build/zlib
 INSTALL_DIR=$(pwd)/build/${PACKAGE_NAME}
-
-log_info "Building zlib for ${TARGET}"
 
 # Get zlib source from Ubuntu
 if [ ! -d "zlib-${ZLIB_VERSION}" ]; then
@@ -52,63 +56,77 @@ rm -rf ${INSTALL_DIR}
 mkdir -p ${INSTALL_DIR}
 make install DESTDIR=${INSTALL_DIR}
 
-# Create runtime package (zlib1g-riscv32-cross)
-log_info "Creating zlib1g-riscv32-cross package..."
-RUNTIME_DIR=$(pwd)/../build/zlib1g-riscv32-cross-runtime
+# Create runtime package with ABI-specific name
+PKG_NAME_RUNTIME="zlib1g-${MABI}"
+log_info "Creating ${PKG_NAME_RUNTIME} package..."
+RUNTIME_DIR=$(pwd)/../build/${PKG_NAME_RUNTIME}-runtime
 mkdir -p ${RUNTIME_DIR}/DEBIAN
-mkdir -p ${RUNTIME_DIR}${PREFIX}/lib
+mkdir -p ${RUNTIME_DIR}/usr/lib/${LIB_DIR}
 
 # Copy runtime libraries
-cp -a ${INSTALL_DIR}${PREFIX}/lib/*.so* ${RUNTIME_DIR}${PREFIX}/lib/ || true
+cp -a ${INSTALL_DIR}${PREFIX}/lib/*.so* ${RUNTIME_DIR}/usr/lib/${LIB_DIR}/ || true
 
 cat > ${RUNTIME_DIR}/DEBIAN/control << EOF
-Package: zlib1g-riscv32-cross
+Package: ${PKG_NAME_RUNTIME}
+Architecture: ${ARCH}
 Version: ${ZLIB_VERSION}-0ubuntu1
+Multi-Arch: same
 Section: libs
 Priority: optional
-Architecture: all
 Maintainer: ${MAINTAINER}
-Description: compression library - runtime (for RISC-V 32-bit cross-compiling)
+Description: compression library - runtime (${ARCH} ${MARCH}-${MABI} cross-compile)
  zlib is a library implementing the deflate compression method found
  in gzip and PKZIP.  This package includes the shared library for
- RISC-V 32-bit.
+ RISC-V 32-bit (${MARCH};${MABI}).
  .
  This package is for cross-compiling.
 EOF
 
 cd ..
-dpkg-deb --build ${RUNTIME_DIR} build/zlib1g-riscv32-cross_${ZLIB_VERSION}-0ubuntu1_all.deb
-log_info "Created: zlib1g-riscv32-cross_${ZLIB_VERSION}-0ubuntu1_all.deb"
+dpkg-deb --build ${RUNTIME_DIR} build/${PKG_NAME_RUNTIME}_${ZLIB_VERSION}-0ubuntu1_${ARCH}.deb
+log_info "Created: ${PKG_NAME_RUNTIME}_${ZLIB_VERSION}-0ubuntu1_${ARCH}.deb"
 
-# Create development package (zlib1g-dev-riscv32-cross)
-log_info "Creating zlib1g-dev-riscv32-cross package..."
-DEV_DIR=$(pwd)/build/zlib1g-dev-riscv32-cross
+# Create development package with ABI-specific name
+PKG_NAME_DEV="zlib1g-dev-${MABI}"
+log_info "Creating ${PKG_NAME_DEV} package..."
+DEV_DIR=$(pwd)/build/${PKG_NAME_DEV}
 mkdir -p ${DEV_DIR}/DEBIAN
-mkdir -p ${DEV_DIR}${PREFIX}
+mkdir -p ${DEV_DIR}/usr/lib/${LIB_DIR}
+mkdir -p ${DEV_DIR}/usr/include/${LIB_DIR}
 
 # Copy development files
-cp -a ${INSTALL_DIR}${PREFIX}/include ${DEV_DIR}${PREFIX}/ || true
-mkdir -p ${DEV_DIR}${PREFIX}/lib
-cp -a ${INSTALL_DIR}${PREFIX}/lib/*.a ${DEV_DIR}${PREFIX}/lib/ || true
-cp -a ${INSTALL_DIR}${PREFIX}/lib/pkgconfig ${DEV_DIR}${PREFIX}/lib/ || true
+cp -a ${INSTALL_DIR}${PREFIX}/include/*.h ${DEV_DIR}/usr/include/${LIB_DIR}/ || true
+cp -a ${INSTALL_DIR}${PREFIX}/lib/libz.so ${DEV_DIR}/usr/lib/${LIB_DIR}/ || true
+cp -a ${INSTALL_DIR}${PREFIX}/lib/*.a ${DEV_DIR}/usr/lib/${LIB_DIR}/ || true
+mkdir -p ${DEV_DIR}/usr/lib/${LIB_DIR}/pkgconfig
+cp -a ${INSTALL_DIR}${PREFIX}/lib/pkgconfig/*.pc ${DEV_DIR}/usr/lib/${LIB_DIR}/pkgconfig/ || true
+
+# Fix pkg-config file paths
+if [ -f ${DEV_DIR}/usr/lib/${LIB_DIR}/pkgconfig/zlib.pc ]; then
+    sed -i "s|prefix=/usr|prefix=/usr|g" ${DEV_DIR}/usr/lib/${LIB_DIR}/pkgconfig/zlib.pc
+    sed -i "s|libdir=.*|libdir=/usr/lib/${LIB_DIR}|g" ${DEV_DIR}/usr/lib/${LIB_DIR}/pkgconfig/zlib.pc
+    sed -i "s|includedir=.*|includedir=/usr/include/${LIB_DIR}|g" ${DEV_DIR}/usr/lib/${LIB_DIR}/pkgconfig/zlib.pc
+fi
 
 cat > ${DEV_DIR}/DEBIAN/control << EOF
-Package: zlib1g-dev-riscv32-cross
+Package: ${PKG_NAME_DEV}
+Architecture: ${ARCH}
 Version: ${ZLIB_VERSION}-0ubuntu1
+Multi-Arch: same
 Section: libdevel
 Priority: optional
-Architecture: all
-Depends: zlib1g-riscv32-cross (= ${ZLIB_VERSION}-0ubuntu1), libc6-dev-riscv32-cross
+Provides: libz-dev
+Depends: ${PKG_NAME_RUNTIME} (= ${ZLIB_VERSION}-0ubuntu1), libc6-dev-${MABI}
 Maintainer: ${MAINTAINER}
-Description: compression library - development (for RISC-V 32-bit cross-compiling)
+Description: compression library - development (${ARCH} ${MARCH}-${MABI} cross-compile)
  zlib is a library implementing the deflate compression method found
  in gzip and PKZIP.  This package includes the development support
- files for RISC-V 32-bit.
+ files for RISC-V 32-bit (${MARCH};${MABI}).
  .
  This package is for cross-compiling.
 EOF
 
-dpkg-deb --build ${DEV_DIR} build/zlib1g-dev-riscv32-cross_${ZLIB_VERSION}-0ubuntu1_all.deb
-log_info "Created: zlib1g-dev-riscv32-cross_${ZLIB_VERSION}-0ubuntu1_all.deb"
+dpkg-deb --build ${DEV_DIR} build/${PKG_NAME_DEV}_${ZLIB_VERSION}-0ubuntu1_${ARCH}.deb
+log_info "Created: ${PKG_NAME_DEV}_${ZLIB_VERSION}-0ubuntu1_${ARCH}.deb"
 
 log_info "zlib build complete!"
