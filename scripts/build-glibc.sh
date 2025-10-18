@@ -179,9 +179,11 @@ RUNTIME_DIR=$(pwd)/build/${PKG_NAME}
 mkdir -p ${RUNTIME_DIR}/DEBIAN
 mkdir -p ${RUNTIME_DIR}/usr/lib/${LIB_DIR}
 
-# Copy runtime libraries
-cp -a ${INSTALL_DIR}/usr/lib/*.so* ${RUNTIME_DIR}/usr/lib/${LIB_DIR}/ 2>/dev/null || true
-cp -a ${INSTALL_DIR}/usr/lib/ld-*.so* ${RUNTIME_DIR}/usr/lib/${LIB_DIR}/ 2>/dev/null || true
+# Copy runtime libraries (only versioned .so files and the dynamic loader)
+# First, copy all .so.* files (versioned libraries)
+find ${INSTALL_DIR}/usr/lib/${LIB_DIR}/ -name "*.so.*" -exec cp -a {} ${RUNTIME_DIR}/usr/lib/${LIB_DIR}/ \; 2>/dev/null || true
+# Copy the dynamic loader (ld-*.so.*)
+cp -a ${INSTALL_DIR}/usr/lib/${LIB_DIR}/ld-*.so.* ${RUNTIME_DIR}/usr/lib/${LIB_DIR}/ 2>/dev/null || true
 
 cat > ${RUNTIME_DIR}/DEBIAN/control << EOF
 Package: ${PKG_NAME}

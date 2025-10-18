@@ -74,7 +74,8 @@ CRYPTO_DIR=$(pwd)/build/${PKG_CRYPTO}
 mkdir -p ${CRYPTO_DIR}/DEBIAN
 mkdir -p ${CRYPTO_DIR}/usr/lib/${LIB_DIR}
 
-cp -a ${INSTALL_DIR}${PREFIX}/lib/libmbedcrypto.so* ${CRYPTO_DIR}/usr/lib/${LIB_DIR}/ || true
+# Copy only versioned .so files (not the unversioned symlink)
+cp -a ${INSTALL_DIR}${PREFIX}/lib/libmbedcrypto.so.* ${CRYPTO_DIR}/usr/lib/${LIB_DIR}/ || true
 
 cat > ${CRYPTO_DIR}/DEBIAN/control << EOF
 Package: ${PKG_CRYPTO}
@@ -100,7 +101,8 @@ X509_DIR=$(pwd)/build/${PKG_X509}
 mkdir -p ${X509_DIR}/DEBIAN
 mkdir -p ${X509_DIR}/usr/lib/${LIB_DIR}
 
-cp -a ${INSTALL_DIR}${PREFIX}/lib/libmbedx509.so* ${X509_DIR}/usr/lib/${LIB_DIR}/ || true
+# Copy only versioned .so files (not the unversioned symlink)
+cp -a ${INSTALL_DIR}${PREFIX}/lib/libmbedx509.so.* ${X509_DIR}/usr/lib/${LIB_DIR}/ || true
 
 cat > ${X509_DIR}/DEBIAN/control << EOF
 Package: ${PKG_X509}
@@ -127,7 +129,8 @@ TLS_DIR=$(pwd)/build/${PKG_TLS}
 mkdir -p ${TLS_DIR}/DEBIAN
 mkdir -p ${TLS_DIR}/usr/lib/${LIB_DIR}
 
-cp -a ${INSTALL_DIR}${PREFIX}/lib/libmbedtls.so* ${TLS_DIR}/usr/lib/${LIB_DIR}/ || true
+# Copy only versioned .so files (not the unversioned symlink)
+cp -a ${INSTALL_DIR}${PREFIX}/lib/libmbedtls.so.* ${TLS_DIR}/usr/lib/${LIB_DIR}/ || true
 
 cat > ${TLS_DIR}/DEBIAN/control << EOF
 Package: ${PKG_TLS}
@@ -155,9 +158,13 @@ mkdir -p ${DEV_DIR}/DEBIAN
 mkdir -p ${DEV_DIR}/usr/lib/${LIB_DIR}
 mkdir -p ${DEV_DIR}/usr/include/${LIB_DIR}
 
-# Copy development files
+# Copy development files (headers, static libraries, and unversioned .so symlinks)
 cp -a ${INSTALL_DIR}${PREFIX}/include/* ${DEV_DIR}/usr/include/${LIB_DIR}/ || true
 cp -a ${INSTALL_DIR}${PREFIX}/lib/*.a ${DEV_DIR}/usr/lib/${LIB_DIR}/ || true
+# Copy unversioned .so symlinks (needed for linking)
+cp -a ${INSTALL_DIR}${PREFIX}/lib/libmbedcrypto.so ${DEV_DIR}/usr/lib/${LIB_DIR}/ || true
+cp -a ${INSTALL_DIR}${PREFIX}/lib/libmbedx509.so ${DEV_DIR}/usr/lib/${LIB_DIR}/ || true
+cp -a ${INSTALL_DIR}${PREFIX}/lib/libmbedtls.so ${DEV_DIR}/usr/lib/${LIB_DIR}/ || true
 
 cat > ${DEV_DIR}/DEBIAN/control << EOF
 Package: ${PKG_DEV}

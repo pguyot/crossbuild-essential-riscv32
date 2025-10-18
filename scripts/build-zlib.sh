@@ -63,8 +63,8 @@ RUNTIME_DIR=$(pwd)/../build/${PKG_NAME_RUNTIME}-runtime
 mkdir -p ${RUNTIME_DIR}/DEBIAN
 mkdir -p ${RUNTIME_DIR}/usr/lib/${LIB_DIR}
 
-# Copy runtime libraries
-cp -a ${INSTALL_DIR}${PREFIX}/lib/*.so* ${RUNTIME_DIR}/usr/lib/${LIB_DIR}/ || true
+# Copy runtime libraries (only versioned .so files, not the unversioned symlink)
+cp -a ${INSTALL_DIR}${PREFIX}/lib/libz.so.* ${RUNTIME_DIR}/usr/lib/${LIB_DIR}/ || true
 
 cat > ${RUNTIME_DIR}/DEBIAN/control << EOF
 Package: ${PKG_NAME_RUNTIME}
