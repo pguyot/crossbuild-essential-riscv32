@@ -156,10 +156,10 @@ if [ -d usr/lib ]; then
     # Remove empty lib directory if it exists
     rmdir usr/lib 2>/dev/null || true
 fi
-# Move headers to ABI-specific path
+# Move headers to shared multiarch path (not ABI-specific)
 if [ -d usr/include ]; then
-    mkdir -p usr/include/${LIB_DIR}
-    mv usr/include/* usr/include/${LIB_DIR}/ 2>/dev/null || true
+    mkdir -p usr/include/${TARGET}
+    mv usr/include/* usr/include/${TARGET}/ 2>/dev/null || true
     # Remove empty include directory if it exists
     rmdir usr/include 2>/dev/null || true
 fi
@@ -167,8 +167,8 @@ fi
 # Manually copy lib-names-${MABI}.h if it was generated
 if [ -f ${BUILD_DIR}/gnu/lib-names-${MABI}.h ]; then
     log_info "Installing lib-names-${MABI}.h..."
-    mkdir -p ${INSTALL_DIR}/usr/include/${LIB_DIR}/gnu
-    cp ${BUILD_DIR}/gnu/lib-names-${MABI}.h ${INSTALL_DIR}/usr/include/${LIB_DIR}/gnu/
+    mkdir -p ${INSTALL_DIR}/usr/include/${TARGET}/gnu
+    cp ${BUILD_DIR}/gnu/lib-names-${MABI}.h ${INSTALL_DIR}/usr/include/${TARGET}/gnu/
 fi
 
 # Create runtime package (libc6-${MABI})
@@ -210,12 +210,12 @@ log_info "Creating ${PKG_DEV} package..."
 DEV_DIR=$(pwd)/build/${PKG_DEV}
 mkdir -p ${DEV_DIR}/DEBIAN
 mkdir -p ${DEV_DIR}/usr/lib/${LIB_DIR}
-mkdir -p ${DEV_DIR}/usr/include/${LIB_DIR}
+mkdir -p ${DEV_DIR}/usr/include/${TARGET}
 
 # Copy development files
-cp -a ${INSTALL_DIR}/usr/include/* ${DEV_DIR}/usr/include/${LIB_DIR}/ 2>/dev/null || true
-cp -a ${INSTALL_DIR}/usr/lib/*.a ${DEV_DIR}/usr/lib/${LIB_DIR}/ 2>/dev/null || true
-cp -a ${INSTALL_DIR}/usr/lib/*.o ${DEV_DIR}/usr/lib/${LIB_DIR}/ 2>/dev/null || true
+cp -a ${INSTALL_DIR}/usr/include/${TARGET}/* ${DEV_DIR}/usr/include/${TARGET}/ 2>/dev/null || true
+cp -a ${INSTALL_DIR}/usr/lib/${LIB_DIR}/*.a ${DEV_DIR}/usr/lib/${LIB_DIR}/ 2>/dev/null || true
+cp -a ${INSTALL_DIR}/usr/lib/${LIB_DIR}/*.o ${DEV_DIR}/usr/lib/${LIB_DIR}/ 2>/dev/null || true
 
 cat > ${DEV_DIR}/DEBIAN/control << EOF
 Package: ${PKG_DEV}
@@ -224,6 +224,8 @@ Architecture: ${ARCH}
 Multi-Arch: same
 Section: libdevel
 Priority: optional
+Conflicts: libc6-dev-ilp32, libc6-dev-ilp32d
+Replaces: libc6-dev-ilp32, libc6-dev-ilp32d
 Depends: ${PKG_NAME} (= ${GLIBC_VERSION}-0ubuntu1)
 Maintainer: ${MAINTAINER}
 Description: GNU C Library: Development Libraries and Headers (${ARCH} ${MARCH}-${MABI} cross-compile)
@@ -231,6 +233,8 @@ Description: GNU C Library: Development Libraries and Headers (${ARCH} ${MARCH}-
  and link programs which use the standard C library for RISC-V 32-bit (${MARCH};${MABI}).
  .
  This package is for cross-compiling.
+ .
+ Headers are shared between ABI variants at /usr/include/${TARGET}.
 EOF
 
 dpkg-deb --build --root-owner-group ${DEV_DIR} build/${PKG_DEV}_${GLIBC_VERSION}-0ubuntu1_${ARCH}.deb

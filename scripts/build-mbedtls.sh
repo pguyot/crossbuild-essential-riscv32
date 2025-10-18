@@ -156,10 +156,10 @@ log_info "Creating ${PKG_DEV} package..."
 DEV_DIR=$(pwd)/build/${PKG_DEV}
 mkdir -p ${DEV_DIR}/DEBIAN
 mkdir -p ${DEV_DIR}/usr/lib/${LIB_DIR}
-mkdir -p ${DEV_DIR}/usr/include/${LIB_DIR}
+mkdir -p ${DEV_DIR}/usr/include/${TARGET}
 
 # Copy development files (headers, static libraries, and unversioned .so symlinks)
-cp -a ${INSTALL_DIR}${PREFIX}/include/* ${DEV_DIR}/usr/include/${LIB_DIR}/ || true
+cp -a ${INSTALL_DIR}${PREFIX}/include/* ${DEV_DIR}/usr/include/${TARGET}/ || true
 cp -a ${INSTALL_DIR}${PREFIX}/lib/*.a ${DEV_DIR}/usr/lib/${LIB_DIR}/ || true
 # Copy unversioned .so symlinks (needed for linking)
 cp -a ${INSTALL_DIR}${PREFIX}/lib/libmbedcrypto.so ${DEV_DIR}/usr/lib/${LIB_DIR}/ || true
@@ -173,6 +173,8 @@ Version: ${MBEDTLS_VERSION}-0ubuntu1
 Multi-Arch: same
 Section: libdevel
 Priority: optional
+Conflicts: libmbedtls-dev-ilp32, libmbedtls-dev-ilp32d
+Replaces: libmbedtls-dev-ilp32, libmbedtls-dev-ilp32d
 Depends: ${PKG_TLS} (= ${MBEDTLS_VERSION}-0ubuntu1), ${PKG_CRYPTO} (= ${MBEDTLS_VERSION}-0ubuntu1), ${PKG_X509} (= ${MBEDTLS_VERSION}-0ubuntu1), libc6-dev-${MABI}
 Maintainer: ${MAINTAINER}
 Description: lightweight crypto and SSL/TLS library - development (${ARCH} ${MARCH}-${MABI} cross-compile)
@@ -182,6 +184,8 @@ Description: lightweight crypto and SSL/TLS library - development (${ARCH} ${MAR
  This package contains the development files for RISC-V 32-bit (${MARCH};${MABI}).
  .
  This package is for cross-compiling.
+ .
+ Headers are shared between ABI variants at /usr/include/${TARGET}.
 EOF
 
 dpkg-deb --build ${DEV_DIR} build/${PKG_DEV}_${MBEDTLS_VERSION}-0ubuntu1_${ARCH}.deb
