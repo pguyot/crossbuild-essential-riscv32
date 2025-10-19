@@ -63,8 +63,8 @@ RUNTIME_DIR=$(pwd)/../build/${PKG_NAME_RUNTIME}-runtime
 mkdir -p ${RUNTIME_DIR}/DEBIAN
 mkdir -p ${RUNTIME_DIR}/usr/lib/${LIB_DIR}
 
-# Copy runtime libraries
-cp -a ${INSTALL_DIR}${PREFIX}/lib/*.so* ${RUNTIME_DIR}/usr/lib/${LIB_DIR}/ || true
+# Copy runtime libraries (only versioned .so files, not the unversioned symlink)
+cp -a ${INSTALL_DIR}${PREFIX}/lib/libz.so.* ${RUNTIME_DIR}/usr/lib/${LIB_DIR}/ || true
 
 cat > ${RUNTIME_DIR}/DEBIAN/control << EOF
 Package: ${PKG_NAME_RUNTIME}
@@ -92,10 +92,10 @@ log_info "Creating ${PKG_NAME_DEV} package..."
 DEV_DIR=$(pwd)/build/${PKG_NAME_DEV}
 mkdir -p ${DEV_DIR}/DEBIAN
 mkdir -p ${DEV_DIR}/usr/lib/${LIB_DIR}
-mkdir -p ${DEV_DIR}/usr/include/${LIB_DIR}
+mkdir -p ${DEV_DIR}/usr/include/${TARGET}
 
 # Copy development files
-cp -a ${INSTALL_DIR}${PREFIX}/include/*.h ${DEV_DIR}/usr/include/${LIB_DIR}/ || true
+cp -a ${INSTALL_DIR}${PREFIX}/include/*.h ${DEV_DIR}/usr/include/${TARGET}/ || true
 cp -a ${INSTALL_DIR}${PREFIX}/lib/libz.so ${DEV_DIR}/usr/lib/${LIB_DIR}/ || true
 cp -a ${INSTALL_DIR}${PREFIX}/lib/*.a ${DEV_DIR}/usr/lib/${LIB_DIR}/ || true
 mkdir -p ${DEV_DIR}/usr/lib/${LIB_DIR}/pkgconfig
@@ -105,7 +105,7 @@ cp -a ${INSTALL_DIR}${PREFIX}/lib/pkgconfig/*.pc ${DEV_DIR}/usr/lib/${LIB_DIR}/p
 if [ -f ${DEV_DIR}/usr/lib/${LIB_DIR}/pkgconfig/zlib.pc ]; then
     sed -i "s|prefix=/usr|prefix=/usr|g" ${DEV_DIR}/usr/lib/${LIB_DIR}/pkgconfig/zlib.pc
     sed -i "s|libdir=.*|libdir=/usr/lib/${LIB_DIR}|g" ${DEV_DIR}/usr/lib/${LIB_DIR}/pkgconfig/zlib.pc
-    sed -i "s|includedir=.*|includedir=/usr/include/${LIB_DIR}|g" ${DEV_DIR}/usr/lib/${LIB_DIR}/pkgconfig/zlib.pc
+    sed -i "s|includedir=.*|includedir=/usr/include/${TARGET}|g" ${DEV_DIR}/usr/lib/${LIB_DIR}/pkgconfig/zlib.pc
 fi
 
 cat > ${DEV_DIR}/DEBIAN/control << EOF
@@ -116,6 +116,8 @@ Multi-Arch: same
 Section: libdevel
 Priority: optional
 Provides: libz-dev
+Conflicts: zlib1g-dev-ilp32, zlib1g-dev-ilp32d
+Replaces: zlib1g-dev-ilp32, zlib1g-dev-ilp32d
 Depends: ${PKG_NAME_RUNTIME} (= ${ZLIB_VERSION}-0ubuntu1), libc6-dev-${MABI}
 Maintainer: ${MAINTAINER}
 Description: compression library - development (${ARCH} ${MARCH}-${MABI} cross-compile)
@@ -124,6 +126,8 @@ Description: compression library - development (${ARCH} ${MARCH}-${MABI} cross-c
  files for RISC-V 32-bit (${MARCH};${MABI}).
  .
  This package is for cross-compiling.
+ .
+ Headers are shared between ABI variants at /usr/include/${TARGET}.
 EOF
 
 dpkg-deb --build ${DEV_DIR} build/${PKG_NAME_DEV}_${ZLIB_VERSION}-0ubuntu1_${ARCH}.deb
